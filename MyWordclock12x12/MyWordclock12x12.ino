@@ -8,13 +8,12 @@
 // TODO:
 // - Farbskala anpassen
 // - Logging in Dateisystem
-// - Unterstützung für HERZ_DATUM vervollstaendigen
-// - Verschönern der Web-Seite
+// // - Verschönern der Web-Seite
 // - Nach Speichern der neuen Parameter des Formulars, ist die Anzeige "aus dem Tritt"
 //
 // DONE:
 // 20200309 Fehler bei der Stundenberechnung vor/nach (15min 20 min)
-//
+// 20200317 Unterstützung für HERZ_DATUM vervollstaendigt
 //
 // Feature Toggles aktivieren mit define, deaktivieren mit undef
 #define GEBURTSTAGE 1
@@ -61,15 +60,6 @@
 #define LEDCOLORORDER RGB
 
 
-//
-// Auswahl der Buchstabenmasken
-//
-#define MASKE_MR 1
-#undef MASKE_FABLAB_FUERTH
-
-#ifdef MASKE_FABLAB_FUERTH
-#undef HERZ						// Kein Herz auf der Buchstabenmaske des Fablab Fuerth
-#endif
 
 #ifdef FEATURE_OTA
 #include <ArduinoOTA.h>         // OTA library
@@ -91,11 +81,22 @@ cLEDText ScrollingMsg;
 #define LAUFSCHRIFT_SPEED	150
 #endif
 
+//
+// Auswahl der Buchstabenmasken
+//
+#define MASKE_MR 1
+#undef MASKE_FABLAB_FUERTH
+
+#ifdef MASKE_FABLAB_FUERTH
+#undef HERZ						// Kein Herz auf der Buchstabenmaske des Fablab Fuerth
+#endif
+
 #ifdef HERZ
-#define HERZ_AUS 	0
-#define HERZ_AN 	1
-#define HERZ_ROT 	2
-#define HERZ_DATUM 	3
+#define HERZ_AUS 		0		// grundsätzlich ist das Herz aus (Hintergrundfarbe)
+#define HERZ_AN 		1		// das Herz wird in Vordergrundfarbe angezeigt
+#define HERZ_ROT 		2		// das Herz wird rot angezeigt
+#define HERZ_DATUM 		3		// das Herz wird am <DATUM> in rot angezeigt
+#define HERZ_STD_DATUM	4		// das Herz wird in Vordergrundfarbe angezaigt, aber am <DATUM> in rot
 #endif
 
 #ifdef LOCALE
@@ -914,25 +915,10 @@ void showLaufschrift(String text, CRGB c = CRGB::White) {
 }
 #endif
 
-void showTime(int hour, int minute) {
-  int singleMinute;
 #ifdef HERZ
+void setHerz() {
   int heute;
-#endif
-  
-  if (hour == -1 || minute == -1) return;
 
-  singleMinute = minute % 5;
-  minute = (minute - (minute % 5));
-
-  if (minute >= words_umschaltung_schwellwert) hour += 1;
-
-  minute = minute / 5;
-  hour = hour % 12;
-
-  resetLEDs();
-
-#ifdef HERZ
   switch (CONFIG.herz) {
   case HERZ_AUS:
 		break;
@@ -949,7 +935,36 @@ void showTime(int hour, int minute) {
 			setWord(W_HERZ, CRGB::Red);
 		}
 		break;
+  case HERZ_STD_DATUM:
+		heute = heute_tag * 100 + heute_monat;
+
+		if (heute == CONFIG.dat_herz) {
+			setWord(W_HERZ, CRGB::Red);
+		} else {
+			setWord(W_HERZ, CONFIG.color_fg);
+		}
+		break;
   }
+}
+#endif
+  
+
+void showTime(int hour, int minute) {
+  int singleMinute;
+  if (hour == -1 || minute == -1) return;
+
+  singleMinute = minute % 5;
+  minute = (minute - (minute % 5));
+
+  if (minute >= words_umschaltung_schwellwert) hour += 1;
+
+  minute = minute / 5;
+  hour = hour % 12;
+
+  resetLEDs();
+
+#ifdef HERZ
+  setHerz();
 #endif
 
   setWord(W_ES_IST, CONFIG.color_fg);
@@ -1049,7 +1064,8 @@ String getTimeForm() {
   content += htmlOption("Aus", String(HERZ_AUS), String(CONFIG.herz));
   content += htmlOption("Standardfarbe", String(HERZ_AN), String(CONFIG.herz));
   content += htmlOption("Rot", String(HERZ_ROT), String(CONFIG.herz));
-  content += htmlOption("Datum", String(HERZ_DATUM), String(CONFIG.herz));
+  content += htmlOption("Aus + Rot am Datum", String(HERZ_DATUM), String(CONFIG.herz));
+  content += htmlOption("Standardfarbe + Rot am Datum", String(HERZ_STD_DATUM), String(CONFIG.herz));
   content += "</select>";
   content += "<label>Datum (TTMM)</label>";
   content += "<input name=\"dat_herz\" value=\"" + ((CONFIG.dat_herz>0)?String(CONFIG.dat_herz):String(" ")) + "\" maxlength=\"4\">";
