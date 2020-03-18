@@ -1,19 +1,24 @@
 //
-// WORDCLOCK
+// WORDCLOCK 12x12
 //
 // Matthias Roessler
 //
 // fuer FabLab Landkreis Fuerth e.V.
 //
 // TODO:
-// - Farbskala anpassen
+// - Prozentzahl explizit im Label der %-Werte auf der Webseite
+// - Ausweisen des wttr.in-Ortes der letzten Zeitermittlung auf der Webseite
 // - Logging in Dateisystem
-// // - Verschönern der Web-Seite
+// - Verschönern der Web-Seite
 // - Nach Speichern der neuen Parameter des Formulars, ist die Anzeige "aus dem Tritt"
+// - Refactoring: Aufteilen in mehrere Dateien
 //
 // DONE:
 // 20200309 Fehler bei der Stundenberechnung vor/nach (15min 20 min)
-// 20200317 Unterstützung für HERZ_DATUM vervollstaendigt
+// 20200317 Verschoenern der Webseite: Optische Trenner eingefügt
+//          Unterstützung für HERZ_DATUM vervollstaendigt
+//          Farbskala anpassen
+// 20200318 Fehler bei der Temperaturanzeige sechzehn statt sechszehn, analog siebzehn
 //
 // Feature Toggles aktivieren mit define, deaktivieren mit undef
 #define GEBURTSTAGE 1
@@ -198,11 +203,12 @@ typedef struct {
 #define W_VIER_PUNKTE		42
 #define W_ZEHNER			43
 #define W_SIEB				44
+#define W_SECH				45
 #ifdef MASKE_MR
-#define W_HERZ				45
-#define W_ARRAYGROESSE		46
+#define W_HERZ				46
+#define W_ARRAYGROESSE		47
 #else
-#define W_ARRAYGROESSE		45
+#define W_ARRAYGROESSE		46
 #endif
 
 //
@@ -271,7 +277,8 @@ int words[W_ARRAYGROESSE][13] = {								// reicht für eine Zeile plus -1 als t
   { 144, 145, 146, -1},											// drei punkte
   { 144, 145, 146, 147, -1},									// vier punkte
   { 104, 105, 106, 107, -1},									// zehn (aber unten)
-  { 89,  88,  87,  86, -1}										// sieb (zehn)
+  { 97,  98,  99, 100, -1},										// sieb (zehn)
+  { 89,  88,  87,  86, -1}										// sech (zehn)
 };
 #else
 int words[W_ARRAYGROESSE][13] = {                				 // reicht für eine Zeile plus -1 als terminierender Wert
@@ -320,6 +327,7 @@ int words[W_ARRAYGROESSE][13] = {                				 // reicht für eine Zeile 
   { 144, 145, 146, 147, 									-1}, // vier punkte
   { 100,101,102,103, 										-1}, // zehn (aber unten)
   { 76,77,78,79, 											-1}, // sieb (zehn)
+  { 72,73,74,75, 											-1}, // sech (zehn)
   { 2,														-1}  // Herz
 };
 #endif
@@ -769,6 +777,10 @@ void setNumber(int n, CRGB c = CRGB::White) {
   }
   else if (n == 12) {
     setWord(W_ZWOELF, c);
+  }
+  else if (n == 16) {
+    setWord(W_SECH, c);
+    setWord(W_ZEHNER, c);
   }
   else if (n == 17) {
     setWord(W_SIEB, c);
