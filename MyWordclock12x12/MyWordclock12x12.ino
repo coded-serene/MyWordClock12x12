@@ -646,27 +646,82 @@ CRGB GetTemperatureColor(int t) {
 
 // WETTER, Temperatur holen
 String GetTemperatureRealLocation() {
-  int httpCode;	
+  WiFiClient client;
   HTTPClient http;            //Declare object of class HTTPClient
+  int httpCode;	
   String weatherstring;
   String payload;
   String location;
   int location_start;
   int location_end;
   
+
+  
   if (WiFi.status() == WL_CONNECTED) {                    						//Check WiFi connection status
-    weatherstring = "http://wttr.in/" + CONFIG.city + "?1";    //Specify request destination
+    weatherstring = "http://wttr.in/" + CONFIG.city + "?1&lang=en";    //Specify request destination
 
 	Serial.println(weatherstring);
 	
-    http.begin(weatherstring);
+    http.begin(client, weatherstring);
     httpCode = http.GET();
 
     if (httpCode == 200) {
-	  int l = http.getSize();
+		
+	  payload="";
 	  
-      payload = http.getString();                  						//Get the response payload
+	  // get lenght of document (is -1 when Server sends no Content-Length header)
+      int len = http.getSize();
+
+      // create buffer for read
+      char buff[128] = { 0 };
+
+      // get tcp stream
+      WiFiClient *stream = &client;
+
+	  location_start=-1;
+	  location_end=-1;
+	  
+      // read all data from server
+      while (http.connected() && (len > 0 || len == -1)) {
+        // read up to 128 byte
+        int c = stream->readBytes(buff, std::min((size_t)len, sizeof(buff)));
+        //Serial.printf("readBytes: %d\n", c);
+        //if (!c) {
+        //    Serial.println("read timeout");
+        //}
+
+        // write it to Serial
+        //Serial.write(buff, c);
+
+		payload += String(buff);
+		
+        if (len > 0) {
+          len -= c;
+        }
+		
+		if (location_start == -1) {
+			location_start = payload.indexOf("Location: ");
+			if (location_start >=0) {
+				payload = payload.substring(location_start);
+			} else {
+				payload = payload.substring(min((int)0,(int)(payload.length()-11)));
+			}
+		}
+		
+		if (location_start >=0 && location_end == -1) {
+			location_end = payload.indexOf("[");
+			if (location_end >= 0) {
+				// 0 kann nicht sein, da der String definitiv mit "Location:" anfängt
+				location = payload.substring(10, location_end -1);
+				len = 0;
+			}
+			// else
+			// wenn nicht gefunden, den Puffer nochmal auslesen und an die payload anhängen
+		}
+      }
 	  	  
+      //payload = http.getString();                  						//Get the response payload
+	  /*	  
       location_start = payload.indexOf("Location: ");
 	  if (location_start >= 0) {
 		location_end = payload.indexOf("[",location_start);
@@ -677,9 +732,10 @@ String GetTemperatureRealLocation() {
 		  location = String("Fehler bei der Ortsbestimmung: Parsen - Unbekannter Ort<br>" + weatherstring + "<br>" + payload);
 		}
 	  } else {
-		location = String("Fehler bei der Ortsbestimmung: Unbekannter Ort<br>")  + weatherstring + String("<br>len(payload)=") + String(payload.length()) + String(" payload=") + payload + String("<br>ret=") + httpCode + String("<br>len=") + String(l);
+		location = String("Fehler bei der Ortsbestimmung: Unbekannter Ort<br>")  + weatherstring + String("<br>len(payload)=") + String(payload.length()) + String(" payload=") + payload + String("<br>ret=") + httpCode;
 	  }
-			
+	  */
+	  
 	} else {
 	  Serial.print  ("ERROR getting TEMPERATURE: httpCode=");   Serial.println(httpCode);
 	  location = String("Fehler bei der Ortsbestimmung: Anfragefehler " + httpCode);
@@ -1202,7 +1258,7 @@ String getTimeForm() {
   content += "<div>";
   content += "<label>Ort</label>";
   content += "<input name=\"city\" value=\"" + String(CONFIG.city) + "\">";
-  content += "<p>" + temperature_real_location + "</p>";
+  content += "<p style=\"font-size:0.75em;\">" + temperature_real_location + "</p>";
   content += "</div>";
 #endif
 
