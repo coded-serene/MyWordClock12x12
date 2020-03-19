@@ -6,7 +6,6 @@
 // fuer FabLab Landkreis Fuerth e.V.
 //
 // TODO:
-// - Prozentzahl explizit im Label der %-Werte auf der Webseite
 // - Ausweisen des wttr.in-Ortes der letzten Zeitermittlung auf der Webseite
 // - Logging in Dateisystem
 // - Verschönern der Web-Seite
@@ -19,6 +18,9 @@
 //          Unterstützung für HERZ_DATUM vervollstaendigt
 //          Farbskala anpassen
 // 20200318 Fehler bei der Temperaturanzeige sechzehn statt sechszehn, analog siebzehn
+//          Bei der Abfrage der Temperatur wird jetzt auch der tatsächtlich von wttr.in verwendete Ort bestimmt und auf der Webseite ausgegeben
+//          Verschoenern der Webseite: "gefährliche" Buttons rot
+//                                     Prozentzahl explizit im Label der %-Werte auf der Webseite
 //
 // Feature Toggles aktivieren mit define, deaktivieren mit undef
 #define GEBURTSTAGE 1
@@ -341,6 +343,7 @@ int words[W_ARRAYGROESSE][13] = {                				 // reicht für eine Zeile 
 int temperature = ERR_TEMP;  // temperatur
 int temperatur_minute = -1;
 unsigned long temperatur_millis = -1;
+String temperature_real_location;	// von wttr.in tatsächlich genutzter Ort, zur Ausgabe auf der Webseite
 #define TEMPERATURE_AUS 0
 #define TEMPERATURE_MINUTE 1
 #define TEMPERATURE_5MINUTE 2
@@ -642,37 +645,94 @@ CRGB GetTemperatureColor(int t) {
 
 
 // WETTER, Temperatur holen
-
-int GetTemperature() {
-  	
-  int temperature = ERR_TEMP; // is a kind of error code!
+String GetTemperatureRealLocation() {
+  int httpCode;	
   HTTPClient http;            //Declare object of class HTTPClient
-  
+  String weatherstring;
+  String payload;
+  String location;
+  int location_start;
+  int location_end;
   
   if (WiFi.status() == WL_CONNECTED) {                    						//Check WiFi connection status
-    String weatherstring = "http://wttr.in/" + CONFIG.city + "\?format=\%t";    //Specify request destination
+    weatherstring = "http://wttr.in/" + CONFIG.city + "?1";    //Specify request destination
 
 	Serial.println(weatherstring);
 	
     http.begin(weatherstring);
-    int httpCode = http.GET();
+    httpCode = http.GET();
 
-    if (httpCode >= 200) {
-      String payload = http.getString();                  						//Get the response payload
+    if (httpCode == 200) {
+	  int l = http.getSize();
+	  
+      payload = http.getString();                  						//Get the response payload
+	  	  
+      location_start = payload.indexOf("Location: ");
+	  if (location_start >= 0) {
+		location_end = payload.indexOf("[",location_start);
+			
+		if (location_end>=0) {
+		  location = payload.substring(location_start+10, location_end -1);
+		} else {
+		  location = String("Fehler bei der Ortsbestimmung: Parsen - Unbekannter Ort<br>" + weatherstring + "<br>" + payload);
+		}
+	  } else {
+		location = String("Fehler bei der Ortsbestimmung: Unbekannter Ort<br>")  + weatherstring + String("<br>len(payload)=") + String(payload.length()) + String(" payload=") + payload + String("<br>ret=") + httpCode + String("<br>len=") + String(l);
+	  }
+			
+	} else {
+	  Serial.print  ("ERROR getting TEMPERATURE: httpCode=");   Serial.println(httpCode);
+	  location = String("Fehler bei der Ortsbestimmung: Anfragefehler " + httpCode);
+    }
 
-      String temp_temperature = payload.substring(0, payload.length() - 4); 	//Format is "+x°C\n" wobei ° zwei Bytes einnimmt!
+    http.end();
+  }
+  
+  Serial.println(location);
+  
+  return location;
+}
+
+int GetTemperature() {
+  int httpCode;	
+  int temperature = ERR_TEMP; // is a kind of error code!
+  HTTPClient http;            //Declare object of class HTTPClient
+  String weatherstring;
+  String payload;
+  String temp_temperature;
+  
+  temperature_real_location = GetTemperatureRealLocation();
+	
+  if (WiFi.status() == WL_CONNECTED) {                    						//Check WiFi connection status
+    weatherstring = "http://wttr.in/" + CONFIG.city + "?format=\%t";    //Specify request destination
+
+	Serial.println(weatherstring);
+	
+    http.begin(weatherstring);
+    httpCode = http.GET();
+
+    if (httpCode >= HTTP_CODE_OK) {
+      payload = http.getString();                  						//Get the response payload
+
+      temp_temperature = payload.substring(0, payload.length() - 4); 	//Format is "+x°C\n" wobei ° zwei Bytes einnimmt!
 
       if ((temp_temperature.charAt(0) == '-') || (temp_temperature.charAt(0) == '+')) { 
 		temperature = temp_temperature.toInt();
       }
+
+	  http.end();
     } else {
       Serial.print  ("ERROR getting TEMPERATURE: httpCode=");   Serial.println(httpCode);
+	  temperature_real_location = String("Fehler bei der Temperaturabfrage: Anfragefehler " + httpCode);
+
+      http.end();                                           						//Close connection
     }
 
-    http.end();                                           						//Close connection
   }
   
   Serial.println(temperature);
+  
+  //temperature_real_location = GetTemperatureRealLocation();
   
   return temperature;
 }
@@ -1032,7 +1092,7 @@ String getTimeForm() {
 
   // Helligkeit
   content += "<div>";
-  content += "<label>Helligkeit (%)</label>";
+  content += "<label>Helligkeit (" + String(CONFIG.brightness) + "%)</label>";
   content += "<input type=\"range\" name=\"brightness\" min=\"0\" max=\"100\" value=\"" + String(CONFIG.brightness) + "\">";
   content += "</div>";
 
@@ -1097,8 +1157,8 @@ String getTimeForm() {
 
   // abgesenkte Helligkeit
   content += "<div>";
-  content += "<label>reduzierte Helligkeit (%)</label>";
-  content += "<input type=\"range\" name=\"dunkelschaltung_brightness\" min=\"0\" max=\"100\" value=\"" + String(CONFIG.dunkelschaltung_brightness) + "\">";
+  content += "<label>reduzierte Helligkeit (" + String(CONFIG.dunkelschaltung_brightness) + "%)</label>";
+  content += "<input type=\"range\" name=\"dunkelschaltung_brightness\" min=\"0\" max=\"50\" value=\"" + String(CONFIG.dunkelschaltung_brightness) + "\">";
   content += "</div>";
 
   content += "<div>";
@@ -1142,6 +1202,7 @@ String getTimeForm() {
   content += "<div>";
   content += "<label>Ort</label>";
   content += "<input name=\"city\" value=\"" + String(CONFIG.city) + "\">";
+  content += "<p>" + temperature_real_location + "</p>";
   content += "</div>";
 #endif
 
@@ -1358,9 +1419,10 @@ void handleRootPath() {
   content += ".form { margin: auto; max-width: 400px; }";
   content += ".form div { margin: 0; padding: 20px 0; width: 100%; font-size: 1.4rem; }";
   content += "label { width: 60%; display: inline-block; margin: 0; vertical-align: middle; }";
-  content += "input, select { width: 38%; display: inline-block; margin: 0; border: 1px solid #eee; padding: 0; height: 40px; vertical-align: middle; }";
+  content += "input, select { width: 38%; display: inline-block; margin: 0; border: 1px solid #eee; padding: 0; height: 40px; vertical-align: right; }";
   content += "select.time { width: 18%; }";
   content += "button { display: inline-block; width: 100%; font-size: 1.4rem; background-color: green; border: 1px solid #eee; color: #fff; padding-top: 10px; padding-bottom: 10px; }";
+  content += "button.danger { display: inline-block; width: 100%; font-size: 1.4rem; background-color: red; border: 1px solid #eee; color: #fff; padding-top: 10px; padding-bottom: 10px; }";
   content += "</style>";
   content += "</head>";
   content += "<body>";
@@ -1396,13 +1458,13 @@ void handleRootPath() {
   content += "<hr label=\"Zurücksetzen\">";
   
   content += "<div>";
-  content += "<button name=\"submit\" type=\"submit\" value=\"ResetConfig\" background-color: red;>Konfiguration zur&uuml;cksetzen</button>";
+  content += "<button name=\"submit\" type=\"submit\" class=\"danger\" value=\"ResetConfig\" background-color=\"red\";>Konfiguration zur&uuml;cksetzen</button>";
   content += "</div>";
   content += "<div>";
-  content += "<button name=\"submit\" type=\"submit\" value=\"ResetWiFi\" background-color: red;>WLAN-Parameter zur&uuml;cksetzen</button>";
+  content += "<button name=\"submit\" type=\"submit\" class=\"danger\" value=\"ResetWiFi\" background-color: red;>WLAN-Parameter zur&uuml;cksetzen</button>";
   content += "</div>";
   content += "<div>";
-  content += "<button name=\"submit\" type=\"submit\" value=\"ResetAll\" background-color: red;>Komplett zur&uuml;cksetzen und Reboot</button>";
+  content += "<button name=\"submit\" type=\"submit\" class=\"danger\" value=\"ResetAll\" background-color: red;>Komplett zur&uuml;cksetzen und Reboot</button>";
   content += "</div>";
 
   content += "</form>";
