@@ -11,6 +11,7 @@
 // - Verschönern der Web-Seite
 // - Nach Speichern der neuen Parameter des Formulars, ist die Anzeige "aus dem Tritt"
 // - Refactoring: Aufteilen in mehrere Dateien
+// - Refactoring: Var brightness ist überflüssig
 //
 // DONE:
 // 20200309 Fehler bei der Stundenberechnung vor/nach (15min 20 min)
@@ -21,30 +22,17 @@
 //          Bei der Abfrage der Temperatur wird jetzt auch der tatsächtlich von wttr.in verwendete Ort bestimmt und auf der Webseite ausgegeben
 //          Verschoenern der Webseite: "gefährliche" Buttons rot
 //                                     Prozentzahl explizit im Label der %-Werte auf der Webseite
+// 20200321 Umfangreiches Refactoring
+// bis  	- Featuretoggle fuer HERZ und LOCALE entfernt, ab sofort enthalten.
+// 20200322
 //
-// Feature Toggles aktivieren mit define, deaktivieren mit undef
-#define GEBURTSTAGE 1
-#define LAUFSCHRIFT 1
-#define TEMPERATURE 1
-#define LOCALE 1
-#define DUNKELSCHALTUNG 1
-#define HERZ 1
-#define FEATURE_OTA 1
+//
+#define MyWC12x12_INO
 
-//#undef GEBURTSTAGE
-//#undef LAUFSCHRIFT
-//#undef TEMPERATURE
-//#undef LOCALE
-//#undef DUNKELSCHALTUNG
-//#undef HERZ
-//#undef FEATURE_OTA
-
-// unterdrücken der PRAGMA-Meldungen in FastLED
-#define FASTLED_INTERNAL
-#define FASTLED_ALLOW_INTERRUPTS 0	// gegen Glitching
+#include "MyWC12x12_config.h" 
 
 #include <ESP8266WiFi.h>
-#include <ESP8266WebServer.h>
+//#include <ESP8266WebServer.h>
 #include <ESP8266HTTPClient.h>
 #include <WiFiUdp.h>
 #include <WiFiManager.h>        // https://github.com/tzapu/WiFiManager
@@ -55,18 +43,10 @@
 #include <ArduinoJson.h>        // arduinojson.org
 #include <time.h>
 
-//
-// Allgemeine Festlegungen
-// Größe der Matrix, damit Azahl der LEDs (+4 wg MiutenLEDs) und Anschluss der LED-Kette an den D2
-//
-#define GRID_ROWS 12
-#define GRID_COLS 12
-#define NUM_LEDS (GRID_ROWS * GRID_COLS) + 4
-#define DATA_PIN 4
-// Je nach LED-Stripe kann RGB oder GRB (oder vllt. auch ein total anderer Typ auszuwählen sein
-#define LEDCOLORORDER RGB
-
-
+#include "MyWC12x12_temperatur.h"
+#include "MyWC12x12_webserver.h"
+#include "MyWC12x12_maske.h"
+#include "MyWC12x12_geburtstage.h"
 
 #ifdef FEATURE_OTA
 #include <ArduinoOTA.h>         // OTA library
@@ -86,321 +66,46 @@ cLEDMatrix < GRID_COLS, -GRID_ROWS, MATRIX_TYPE > mleds;
 cLEDText ScrollingMsg;
 
 #define LAUFSCHRIFT_SPEED	150
-#endif
 
-//
-// Auswahl der Buchstabenmasken
-//
-#define MASKE_MR 1
-#undef MASKE_FABLAB_FUERTH
-
-#ifdef MASKE_FABLAB_FUERTH
-#undef HERZ						// Kein Herz auf der Buchstabenmaske des Fablab Fuerth
-#endif
-
-#ifdef HERZ
-#define HERZ_AUS 		0		// grundsätzlich ist das Herz aus (Hintergrundfarbe)
-#define HERZ_AN 		1		// das Herz wird in Vordergrundfarbe angezeigt
-#define HERZ_ROT 		2		// das Herz wird rot angezeigt
-#define HERZ_DATUM 		3		// das Herz wird am <DATUM> in rot angezeigt
-#define HERZ_STD_DATUM	4		// das Herz wird in Vordergrundfarbe angezaigt, aber am <DATUM> in rot
-#endif
-
-#ifdef LOCALE
-// Sprachlokalisierungen, vorerst nur Deutsch und Fränkisch
-#define L_DEUTSCHLAND 		0
-#define L_FRANKEN 			1
-#define L_W_DEUTSCHLAND		"Deutsch"
-#define L_W_FRANKEN			"Fr&aumlnkisch"
-#define L_S_DEUTSCHLAND     25
-#define L_S_FRANKEN 		15
+char buffer[256];
 #endif
 
 
 CRGB leds[NUM_LEDS];
-
-typedef struct {
-  CRGB color_bg;
-  CRGB color_fg;
-  int brightness;
-  int timezone;
-#ifdef DUNKELSCHALTUNG
-  bool dunkelschaltung_active;
-  int dunkelschaltung_start;
-  int dunkelschaltung_end;
-  int dunkelschaltung_brightness;
-#endif
-#ifdef TEMPERATURE
-  int temp_active;
-  CRGB temp_color;
-  String city;
-#endif
-#ifdef LOCALE
-  int locale;
-#endif
-#ifdef GEBURTSTAGE
-  String geb_name_1;
-  String geb_name_2;
-  String geb_name_3;
-  String geb_name_4;
-  String geb_name_5;
-  int geb_1;
-  int geb_2;
-  int geb_3;
-  int geb_4;
-  int geb_5;
-#endif
-#ifdef HERZ
-  int herz;
-  int dat_herz;
-#endif
-} config_t;
+config_t CONFIG;
+String ip;
 
 //
-// Wortindices, sind unabhängig von der Buchstabenmaske, beschreiben die Position im Array der Worte
+// Modulvariable
 //
-#define W_NOWORD			-1
-#define W_UHR				0
-#define W_FUENF_NACH		1
-#define W_ZEHN_NACH			2
-#define W_VIERTEL_NACH		3
-#define W_ZWANZIG_NACH		4
-#define W_FUENF_VOR_HALB	5
-#define W_HALB				6
-#define W_FUENF_NACH_HALB	7
-#define W_ZWANZIG_VOR		8
-#define W_VIERTEL_VOR		9
-#define W_ZEHN_VOR			10
-#define W_FUENF_VOR			11
-#define W_ES_IST			12
-#define W_ZWOELF			13
-#define W_EINS				14
-#define W_ZWEI				15
-#define W_DREI				16
-#define W_VIER				17
-#define W_FUENF				18
-#define W_SECHS				19
-#define W_SIEBEN            20
-#define W_ACHT              21
-#define W_NEUN              22
-#define W_ZEHN 				23
-#define W_ELF 				24
-#define W_EIN				25
-#define W_WLAN				26
-#define W_VIERTEL			27
-#define W_ZEHN_VOR_HALB		28
-#define W_ZEHN_NACH_HALB	29
-#define W_DREIVIERTEL		30
-#define W_UND				31
-#define W_ZWANZIG			32
-#define W_DREISSIG			33
-#define W_PLUS				34
-#define W_MINUS				35
-#define W_GRAD				36
-#define W_NULL				37
-#define W_PUNKT				38
-#define W_EIN_PUNKT			39
-#define W_ZWEI_PUNKTE		40
-#define W_DREI_PUNKTE		41
-#define W_VIER_PUNKTE		42
-#define W_ZEHNER			43
-#define W_SIEB				44
-#define W_SECH				45
-#ifdef MASKE_MR
-#define W_HERZ				46
-#define W_ARRAYGROESSE		47
-#else
-#define W_ARRAYGROESSE		46
-#endif
+int hour = -1;
+int minute = -1;
 
-//
-// Wortlisten
-//
-int wordsindex_single_m[] = { W_NOWORD, W_EIN_PUNKT, W_ZWEI_PUNKTE, W_DREI_PUNKTE, W_VIER_PUNKTE};
-int wordsindex_minutes[] = { W_UHR, W_FUENF_NACH, W_ZEHN_NACH, W_VIERTEL_NACH, W_ZWANZIG_NACH, W_FUENF_VOR_HALB, W_HALB, W_FUENF_NACH_HALB, W_ZWANZIG_VOR, W_VIERTEL_VOR, W_ZEHN_VOR, W_FUENF_VOR };
-int wordsindex_hours[] = {W_ZWOELF, W_EINS, W_ZWEI, W_DREI, W_VIER, W_FUENF, W_SECHS, W_SIEBEN, W_ACHT, W_NEUN, W_ZEHN, W_ELF};
-int wordsindex_ziffern[] = {W_NULL, W_EIN, W_ZWEI, W_DREI, W_VIER, W_FUENF, W_SECHS, W_SIEBEN, W_ACHT, W_NEUN};
-
-// Ab wann (Minutenindex) wird von den "nach"-Angaben auf "vor"-Angaben umgeschaltet unf damit die tatsächliche Stunde um eine erhöht.
-// Kann in uterschiedliche Lokalisierungen unterschiedlich ausfallen
-int words_umschaltung_schwellwert = L_S_DEUTSCHLAND;
-
-//
-// Abbildung der Buchstabenmasken
-// Welche LED ist für welches Wort zu aktivieren?
-//
-// Ergibt sich aus dem Layout der Maske. Jedes Wort wird mit -1 terminiert. Da pro Wort 13 ints vorgesehen werden, kann in einer 12x12-Matrix eine ganze Zeile mit einem Wort angeschaltet werden.
-//
-
-#ifdef MASKE_FABLAB_FUERTH
-
-int words[W_ARRAYGROESSE][13] = {								// reicht für eine Zeile plus -1 als terminierender Wert
-  { 134, 133, 132,  -1}, 										// uhr
-  { 8,   9,  10,  11, 18, 17, 16, 15, -1}, 						// fuenf nach
-  { 23,  22,  21,  20,  18, 17, 16, 15, -1}, 					// zehn nach
-  { 28,  29,  30,  31,  32, 33, 34,  18, 17, 16, 15, -1}, 		// viertel nach
-  { 114, 113, 112, 111, 110, 109, 108,  18, 17, 16, 15, -1}, 	// zwanzig nach
-  {  8,   9,  10,  11,  14,  13,  12,  47, 46, 45, 44, -1}, 	// fuenf vor halb
-  { 47, 46, 45, 44, -1},										// halb
-  {  8,   9,  10,  11, 18,  17,  16,  15,  47, 46, 45, 44, -1},	// fuenf nach halb
-  {  114, 113, 112, 111, 110, 109, 108,  14, 13, 12, -1}, 		// zwanzig vor
-  { 28,  29,  30,  31,  32, 33, 34,  14,  13,  12,  -1,  -1}, 	// viertel vor
-  { 23, 22, 21, 20, 14,  13,  12,  -1},						 	// zehn vor
-  { 8,   9,  10,  11, 14,  13,  12,  -1}, 						// fuenf vor
-  { 0, 1, 3, 4, 5, -1},											// es ist
-  { 143, 142, 141, 140, 139,  -1}, 								// zwoelf
-  { 39,  38,  37,  36,  -1}, 									// eins
-  { 70,  69,  68,  67,  -1}, 									// zwei
-  { 72,  73,  74,  75,  -1}, 									// drei
-  { 80,  81,  82,  83,  -1}, 									// vier
-  { 76,  77,  78,  79,  -1}, 									// fuenf
-  { 97,  98,  99, 100, 101,  -1}, 								// sechs
-  { 89,  88,  87,  86,  85,  84, -1},							// sieben
-  { 94,  93,  92,  91,  -1},									// acht
-  { 55,  56,  57,  58,  -1},									// neun
-  {104, 105, 106, 107,  -1},									// zehn
-  {129, 130, 131,  -1},											// elf
-  { 39,  38,  37,  -1}, 		 								// ein
-  { 69, 62, 94, 84, -1 },										// WLAN
-  { 28,  29,  30,  31,  32,  33,  34, -1}, 						// viertel
-  { 23,  22,  21,  20,  12,  13,  14, 47, 46, 45, 44, -1},		// zehn vor halb
-  { 23,  22,  21,  20,  18,  17,  16, 15, 47, 46, 45, 44, -1},	// zehn nach halb
-  { 24, 25, 26,  27,  28,  29,  30,  31,  32, 33, 34, -1 },		// dreiviertel
-  { 119, 118, 117, -1 },										// und
-  { 114, 113, 112, 111, 110, 109, 108, -1 },					// zwanzig
-  { 120, 121, 122, 123, 124, 125, 126, 127, -1 },				// dreissig
-  { 43, 42, 41, 40, -1 },										// plus
-  { 49, 50, 51, 52, 53, -1 },									// minus
-  { 138, 137, 136, 135, -1 },									// grad
-  {  61, 62, 63, 64, -1 },										// null
-  { 103, -1 },													// punkt
-  { 144, -1},													// ein punkt
-  { 144, 145, -1},												// zwei punkte
-  { 144, 145, 146, -1},											// drei punkte
-  { 144, 145, 146, 147, -1},									// vier punkte
-  { 104, 105, 106, 107, -1},									// zehn (aber unten)
-  { 97,  98,  99, 100, -1},										// sieb (zehn)
-  { 89,  88,  87,  86, -1}										// sech (zehn)
-};
-#else
-int words[W_ARRAYGROESSE][13] = {                				 // reicht für eine Zeile plus -1 als terminierender Wert
-  { 134,133,132,											-1}, // uhr
-  { 7,8,9,10, 44,43,42,41, 									-1}, // fuenf nach
-  { 23,22,21,20,  44,43,42,41, 								-1}, // zehn nach
-  { 29,30,31,32,33,34,35, 44,43,42,41,			 			-1}, // viertel nach
-  { 12, 13, 14, 15, 16, 17, 18,  44, 43, 42, 41, 			-1}, // zwanzig nach
-  {  7, 8, 9, 10,  47, 46, 45,  36, 37, 38, 39, 			-1}, // fuenf vor halb
-  { 36, 37, 38, 39, 										-1}, // halb
-  {  7, 8, 9, 10, 44, 43, 42, 41,  36, 37, 38, 39, 			-1}, // fuenf nach halb
-  { 12, 13, 14, 15, 16, 17, 18, 45, 46, 47, 				-1}, // zwanzig vor
-  { 29, 30, 31, 32, 33, 34, 35,  45, 46, 47, 				-1}, // viertel vor
-  { 23, 22, 21, 20, 45, 46, 47,  							-1}, // zehn vor
-  { 7, 8, 9, 10, 45, 46, 47,  								-1}, // fuenf vor
-  { 0, 1, 3, 4, 5, 											-1}, // es ist !
-  { 127,128,129,130,131,  									-1}, // zwoelf
-  { 95,94,93,92,  											-1}, // eins
-  { 87,86,85,84,  											-1}, // zwei
-  { 91,90,89,88,  											-1}, // drei
-  { 71,70,69,68,  											-1}, // vier
-  { 63,62,61,60,  											-1}, // fuenf
-  { 72,73,74,75,76, 										-1}, // sechs
-  { 76,77,78,79,80,81, 										-1}, // sieben
-  { 67,66,65,64,  											-1}, // acht
-  { 96,97,98,99,  											-1}, // neun
-  {100, 101, 102, 103,  									-1}, // zehn
-  {104, 105, 106,  											-1}, // elf
-  { 93,94,95,  												-1}, // ein
-  { 11,35, 59, 83, 											-1}, // WLAN
-  { 29, 30, 31, 32, 33, 34, 35, 							-1}, // viertel
-  { 23,22,21,20, 45,46,47, 36,37,38,39, 					-1}, // zehn vor halb
-  { 23,22,21,20, 44,43,42,41, 36,37,38,39, 					-1}, // zehn nach halb
-  { 25,26,27,28,29,30,31,32,33,34,35,						-1}, // dreiviertel
-  { 119,118,117,											-1}, // und
-  { 120,121,122,123,124,125,126, 							-1}, // zwanzig
-  { 115,114,113,112,111,110,109,108, 						-1}, // dreissig
-  { 48,49,50,51, 											-1}, // plus
-  { 54,55,56,57,58, 										-1}, // minus
-  { 138, 137, 136, 135, 									-1}, // grad
-  { 143,142,141,140, 										-1}, // null
-  { 144, 													-1}, // punkt
-  { 144, 													-1}, // ein punkt
-  { 144, 145, 												-1}, // zwei punkte
-  { 144, 145, 146, 											-1}, // drei punkte
-  { 144, 145, 146, 147, 									-1}, // vier punkte
-  { 100,101,102,103, 										-1}, // zehn (aber unten)
-  { 76,77,78,79, 											-1}, // sieb (zehn)
-  { 72,73,74,75, 											-1}, // sech (zehn)
-  { 2,														-1}  // Herz
-};
-#endif
-
-#define CONFIGFILE "/wordclock_config.json"
-#define MODE_TIME 0
-
-#ifdef TEMPERATURE
-#define MODE_TEMP 1
-#define ERR_TEMP  1000 		 // Fehlerwert, wenn die Temperatur nicht ermittelt werden kann
-int temperature = ERR_TEMP;  // temperatur
-int temperatur_minute = -1;
-unsigned long temperatur_millis = -1;
-String temperature_real_location;	// von wttr.in tatsächlich genutzter Ort, zur Ausgabe auf der Webseite
-#define TEMPERATURE_AUS 0
-#define TEMPERATURE_MINUTE 1
-#define TEMPERATURE_5MINUTE 2
-
-#define TEMPERATURE_DURATION 5000
-#endif
-
-#ifdef GEBURTSTAGE
-#define MODE_BIRTHDAY 2
 int heute_tag = -1;
 int heute_monat = -1;
 int heute_jahr = -1;
-int geburtstag_minute = -1;
+
+static int myMode;			// aktueller Anzeigemodus für den Zustandsautomaten
+static bool mode_change;
+
+#ifdef TEMPERATURE
+int temperatur_minute = -1;				// Minute, zu der zum letzten Mal die Temperatur angezeigt wurde
+unsigned long temperatur_millis = -1;
+#endif
+#ifdef GEBURTSTAGE
+int geburtstag_minute = -1;				// Minute, zu der zum letzten Mal die Geburtstagslaufschrift angezeigt wurde
 unsigned long geburtstag_millis = -1;
 int geburtstag_ende = 0;
-//
-// Für die Geburtstage soll die Farbe der aktivierten LEDs wie ein Regenbogen durchscrollen.
-// In dieser Matrix wird vermerkt, welche LED aktiviert ist.
-//
-uint8_t mask[NUM_LEDS];
 #endif
-
-#ifdef LAUFSCHRIFT
-char buffer[256];
-#endif
-
-int mymode = MODE_TIME;
-int brightness = 20;
-int timezone = 0;
-int hour = -1;
-int minute = -1;
-String ip = "";
-
-config_t CONFIG;
 
 //
 // Zeitermittlung
-WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "pool.ntp.org", 3600, 3600000);
-
-//
-// Webserver für die Konfiguration
-ESP8266WebServer server(80);
-
+//WiFiUDP ntpUDP;
+//NTPClient timeClient(ntpUDP, "pool.ntp.org", 3600, 3600000);
 //
 // Wifi-Manager für die Netzverbindung
 WiFiManager wifiManager;
 
-
-// Setzen der Helligkeit in %
-//
-void SetBrightness(int b) {
-	if ((b<0)||(b>100))
-		return;
-	
-	FastLED.setBrightness((int)((float)b * 2.55));
-}
 
 //
 // Funktionen zum WiFi-Betrieb
@@ -419,33 +124,33 @@ void resetAllAndReboot() {
 }
 
 
+//
+// Funktionen zum Laden und Speichern der Konfiguration
+//
 
-
-void loadConfig() {
-
+void defaultConfig() {
   // Falbackwerte
-  CONFIG.color_bg = CRGB::Black;
-  CONFIG.color_fg = CRGB::White;
-  CONFIG.brightness = 50; // %
+  CONFIG.color_bg 					= CRGB::Black;
+  CONFIG.color_fg 					= CRGB::White;
+  CONFIG.brightness 				= BRIGHTNESS_DEFAULT; // %
 
-  CONFIG.timezone = 1;
+  CONFIG.timezone 					= 1;
 
-#ifdef DUNKELSCHALTUNG
   // Fallback: Dunkelschaltung inaktiv
-  CONFIG.dunkelschaltung_active = false;
-  CONFIG.dunkelschaltung_brightness = 5; // %
-  CONFIG.dunkelschaltung_start = -1;
-  CONFIG.dunkelschaltung_end = -1;
-#endif
+  CONFIG.dunkelschaltung_active 	= false;
+  CONFIG.dunkelschaltung_brightness	= 5; // %
+  CONFIG.dunkelschaltung_start 		= 2200;
+  CONFIG.dunkelschaltung_end 		= 600;
+
 #ifdef TEMPERATURE
   // Temperaturanzeige zu jeder Minute
-  CONFIG.temp_active = TEMPERATURE_MINUTE;
-  CONFIG.city = "Erlangen";
+  CONFIG.temp_active 				= TEMPERATURE_MINUTE;
+  CONFIG.city 						= "Erlangen";
 #endif
-#ifdef LOCALE
+
   // allg. deutsche Sprache
-  CONFIG.locale = L_DEUTSCHLAND;
-#endif
+  CONFIG.locale 					= L_DEUTSCHLAND;
+
 #ifdef GEBURTSTAGE
   CONFIG.geb_1 = -1;
   CONFIG.geb_2 = -1;
@@ -458,11 +163,14 @@ void loadConfig() {
   CONFIG.geb_name_4 = "";
   CONFIG.geb_name_5 = "";
 #endif
-#ifdef HERZ
-  CONFIG.herz = HERZ_ROT;
-  CONFIG.dat_herz = -1;
-#endif
 
+  CONFIG.herz 						= HERZ_ROT;
+  CONFIG.dat_herz 					= -1;
+}
+
+void loadConfig() {
+
+  defaultConfig();
 
   File file = SPIFFS.open(CONFIGFILE, "r");
 
@@ -479,56 +187,55 @@ void loadConfig() {
 
   Serial.println(doc.as<String>());
 
-  CONFIG.color_bg.r = doc["color_bg_r"].as<int>();
-  CONFIG.color_bg.g = doc["color_bg_g"].as<int>();
-  CONFIG.color_bg.b = doc["color_bg_b"].as<int>();
+  CONFIG.color_bg.r 				= doc["color_bg_r"].as<int>();
+  CONFIG.color_bg.g 				= doc["color_bg_g"].as<int>();
+  CONFIG.color_bg.b 				= doc["color_bg_b"].as<int>();
 
-  CONFIG.color_fg.r = doc["color_fg_r"].as<int>();
-  CONFIG.color_fg.g = doc["color_fg_g"].as<int>();
-  CONFIG.color_fg.b = doc["color_fg_b"].as<int>();
+  CONFIG.color_fg.r 				= doc["color_fg_r"].as<int>();
+  CONFIG.color_fg.g 				= doc["color_fg_g"].as<int>();
+  CONFIG.color_fg.b 				= doc["color_fg_b"].as<int>();
 
-  CONFIG.brightness = doc["brightness"].as<int>();
-  brightness = CONFIG.brightness;
+  CONFIG.brightness 				= doc["brightness"].as<int>();
   
-  SetBrightness(brightness);
-  
-  CONFIG.timezone = doc["timezone"].as<int>();
-  timeClient.setTimeOffset(CONFIG.timezone * 3600);
+  CONFIG.timezone 					= doc["timezone"].as<int>();
+  //timeClient.setTimeOffset(CONFIG.timezone * 3600);
+  configTime(3600 * CONFIG.timezone, 1 * 3600, "0.pool.ntp.org", "time.nist.gov", "1.pool.ntp.org");
 
-#ifdef DUNKELSCHALTUNG
-  CONFIG.dunkelschaltung_active = doc["dunkelschaltung_active"].as<bool>();
-  CONFIG.dunkelschaltung_start = doc["dunkelschaltung_start"].as<int>();
-  CONFIG.dunkelschaltung_end = doc["dunkelschaltung_end"].as<int>();
-  CONFIG.dunkelschaltung_brightness = doc["dunkelschaltung_brightness"].as<int>();
-#endif
+  CONFIG.dunkelschaltung_active 	= doc["dunkelschaltung_active"].as<bool>();
+  CONFIG.dunkelschaltung_start 		= doc["dunkelschaltung_start"].as<int>();
+  CONFIG.dunkelschaltung_end 		= doc["dunkelschaltung_end"].as<int>();
+  CONFIG.dunkelschaltung_brightness	= doc["dunkelschaltung_brightness"].as<int>();
+
+  SetBrightness(BRIGHTNESS_AUTO);
+
 #ifdef TEMPERATURE
-  CONFIG.temp_active = doc["temp_active"].as<int>();
-  CONFIG.city = doc["city"].as<char *>();
+  CONFIG.temp_active 				= doc["temp_active"].as<int>();
+  CONFIG.city 						= doc["city"].as<char *>();
 #endif
-#ifdef LOCALE
-  CONFIG.locale = doc["locale"].as<int>();
+
+  CONFIG.locale 					= doc["locale"].as<int>();
   // richtiges Sprachmodell auswaehlen
   changeLocale();
-#endif
+
 #ifdef GEBURTSTAGE
-  CONFIG.geb_1 = doc["geb_1"].as<int>();
-  CONFIG.geb_2 = doc["geb_2"].as<int>();
-  CONFIG.geb_3 = doc["geb_3"].as<int>();
-  CONFIG.geb_4 = doc["geb_4"].as<int>();
-  CONFIG.geb_5 = doc["geb_5"].as<int>();
-  CONFIG.geb_name_1 = doc["geb_name_1"].as<char *>();
-  CONFIG.geb_name_2 = doc["geb_name_2"].as<char *>();
-  CONFIG.geb_name_3 = doc["geb_name_3"].as<char *>();
-  CONFIG.geb_name_4 = doc["geb_name_4"].as<char *>();
-  CONFIG.geb_name_5 = doc["geb_name_5"].as<char *>();
+  CONFIG.geb_1 						= doc["geb_1"].as<int>();
+  CONFIG.geb_2 						= doc["geb_2"].as<int>();
+  CONFIG.geb_3 						= doc["geb_3"].as<int>();
+  CONFIG.geb_4 						= doc["geb_4"].as<int>();
+  CONFIG.geb_5 						= doc["geb_5"].as<int>();
+  CONFIG.geb_name_1 				= doc["geb_name_1"].as<char *>();
+  CONFIG.geb_name_2 				= doc["geb_name_2"].as<char *>();
+  CONFIG.geb_name_3 				= doc["geb_name_3"].as<char *>();
+  CONFIG.geb_name_4 				= doc["geb_name_4"].as<char *>();
+  CONFIG.geb_name_5 				= doc["geb_name_5"].as<char *>();
 #endif
-#ifdef HERZ
-  CONFIG.herz = doc["herz"].as<int>();
-  CONFIG.dat_herz = doc["dat_herz"].as<int>();
-#endif
+
+  CONFIG.herz 						= doc["herz"].as<int>();
+  CONFIG.dat_herz 					= doc["dat_herz"].as<int>();
 
   file.close();
 }
+
 
 void saveConfig() {
   File file = SPIFFS.open(CONFIGFILE, "w");
@@ -543,43 +250,41 @@ void saveConfig() {
 
   StaticJsonDocument<1024> doc;
   
-  doc["color_bg_r"] = CONFIG.color_bg.r;
-  doc["color_bg_g"] = CONFIG.color_bg.g;
-  doc["color_bg_b"] = CONFIG.color_bg.b;
-  doc["color_fg_r"] = CONFIG.color_fg.r;
-  doc["color_fg_g"] = CONFIG.color_fg.g;
-  doc["color_fg_b"] = CONFIG.color_fg.b;
-  doc["brightness"] = CONFIG.brightness;
-  doc["timezone"] = CONFIG.timezone;
-#ifdef DUNKELSCHALTUNG
-  doc["dunkelschaltung_active"] = CONFIG.dunkelschaltung_active;
-  doc["dunkelschaltung_start"] = CONFIG.dunkelschaltung_start;
-  doc["dunkelschaltung_end"] = CONFIG.dunkelschaltung_end;
-  doc["dunkelschaltung_brightness"] = CONFIG.dunkelschaltung_brightness;
-#endif
+  doc["color_bg_r"] 				= CONFIG.color_bg.r;
+  doc["color_bg_g"] 				= CONFIG.color_bg.g;
+  doc["color_bg_b"] 				= CONFIG.color_bg.b;
+  doc["color_fg_r"] 				= CONFIG.color_fg.r;
+  doc["color_fg_g"] 				= CONFIG.color_fg.g;
+  doc["color_fg_b"] 				= CONFIG.color_fg.b;
+  doc["brightness"] 				= CONFIG.brightness;
+  doc["timezone"] 					= CONFIG.timezone;
+
+  doc["dunkelschaltung_active"] 	= CONFIG.dunkelschaltung_active;
+  doc["dunkelschaltung_start"] 		= CONFIG.dunkelschaltung_start;
+  doc["dunkelschaltung_end"] 		= CONFIG.dunkelschaltung_end;
+  doc["dunkelschaltung_brightness"]	= CONFIG.dunkelschaltung_brightness;
+
 #ifdef TEMPERATURE
-  doc["city"] = CONFIG.city;
-  doc["temp_active"] = CONFIG.temp_active;
+  doc["city"] 						= CONFIG.city;
+  doc["temp_active"] 				= CONFIG.temp_active;
 #endif
-#ifdef LOCALE
-  doc["locale"] = CONFIG.locale;
-#endif
+
+  doc["locale"] 					= CONFIG.locale;
+
 #ifdef GEBURTSTAGE
-  doc["geb_1"] = CONFIG.geb_1;
-  doc["geb_2"] = CONFIG.geb_2;
-  doc["geb_3"] = CONFIG.geb_3;
-  doc["geb_4"] = CONFIG.geb_4;
-  doc["geb_5"] = CONFIG.geb_5;
-  doc["geb_name_1"] = CONFIG.geb_name_1;
-  doc["geb_name_2"] = CONFIG.geb_name_2;
-  doc["geb_name_3"] = CONFIG.geb_name_3;
-  doc["geb_name_4"] = CONFIG.geb_name_4;
-  doc["geb_name_5"] = CONFIG.geb_name_5;
+  doc["geb_1"] 						= CONFIG.geb_1;
+  doc["geb_2"] 						= CONFIG.geb_2;
+  doc["geb_3"] 						= CONFIG.geb_3;
+  doc["geb_4"] 						= CONFIG.geb_4;
+  doc["geb_5"] 						= CONFIG.geb_5;
+  doc["geb_name_1"] 				= CONFIG.geb_name_1;
+  doc["geb_name_2"] 				= CONFIG.geb_name_2;
+  doc["geb_name_3"] 				= CONFIG.geb_name_3;
+  doc["geb_name_4"] 				= CONFIG.geb_name_4;
+  doc["geb_name_5"] 				= CONFIG.geb_name_5;
 #endif
-#ifdef HERZ
-  doc["herz"] = CONFIG.herz;
-  doc["dat_herz"] = CONFIG.dat_herz;
-#endif
+  doc["herz"] 						= CONFIG.herz;
+  doc["dat_herz"] 					= CONFIG.dat_herz;
 
   serializeJson(doc, file);
 
@@ -588,212 +293,19 @@ void saveConfig() {
   file.close();
 }
 
-CRGB hexToRgb(String value) {
-  value.replace("#", "");
-
-  CRGB rgb = (uint32_t) strtol( value.c_str(), NULL, 16);
-
-  return rgb;
-}
-
-String rgbToHex(const CRGB hex) {
-  long hexColor = ((long)hex.r << 16L) | ((long)hex.g << 8L) | (long)hex.b;
-
-  String out = String(hexColor, HEX);
-
-  while (out.length() < 6) {
-    out = "0" + out;
-  }
-
-  return out;
-}
-
-#ifdef TEMPERATURE
-// Farbabstufung der Temperaturanzeige
+// Setzen der Helligkeit in %
 //
-CRGB GetTemperatureColor(int t) {
-	// -39 bis -5	blau
-	// -4  bis 0	hellblau
-	// 1   bis 5    gruen
-	// 6   bis 15   hellgruen
-	// 16  bis 20   gelb
-	// 21  bis 27   orange
-	// 28  bis 39   rot
-	if (t<=-5) {
-		return CRGB::Blue;
-	}
-	else if (t<=0) {
-		return CRGB::LightSkyBlue;
-	}
-	else if (t<=5) {
-		return CRGB::SeaGreen;
-	}
-	else if (t<=15) {
-		return CRGB::Green;
-	}
-	else if (t<=20) {
-		return CRGB::Yellow;
-	}
-	else if (t<=27) {
-		return CRGB::Orange;
-	}
-	else {
-		return CRGB::Red;
-	}
-	return CRGB::Red;
-}
+void SetBrightness(int b) {
 
-
-// WETTER, Temperatur holen
-String GetTemperatureRealLocation() {
-  WiFiClient client;
-  HTTPClient http;            //Declare object of class HTTPClient
-  int httpCode;	
-  String weatherstring;
-  String payload;
-  String location;
-  int location_start;
-  int location_end;
-  
-
-  
-  if (WiFi.status() == WL_CONNECTED) {                    						//Check WiFi connection status
-    weatherstring = "http://wttr.in/" + CONFIG.city + "?1&lang=en";    //Specify request destination
-
-	Serial.println(weatherstring);
+	if (b == BRIGHTNESS_AUTO) {
+		b = (jetztDunkelschaltung(hour, minute)) ? CONFIG.dunkelschaltung_brightness : CONFIG.brightness;
+	}
 	
-    http.begin(client, weatherstring);
-    httpCode = http.GET();
-
-    if (httpCode == 200) {
-		
-	  payload="";
-	  
-	  // get lenght of document (is -1 when Server sends no Content-Length header)
-      int len = http.getSize();
-
-      // create buffer for read
-      char buff[128] = { 0 };
-
-      // get tcp stream
-      WiFiClient *stream = &client;
-
-	  location_start=-1;
-	  location_end=-1;
-	  
-      // read all data from server
-      while (http.connected() && (len > 0 || len == -1)) {
-        // read up to 128 byte
-        int c = stream->readBytes(buff, std::min((size_t)len, sizeof(buff)));
-        //Serial.printf("readBytes: %d\n", c);
-        //if (!c) {
-        //    Serial.println("read timeout");
-        //}
-
-        // write it to Serial
-        //Serial.write(buff, c);
-
-		payload += String(buff);
-		
-        if (len > 0) {
-          len -= c;
-        }
-		
-		if (location_start == -1) {
-			location_start = payload.indexOf("Location: ");
-			if (location_start >=0) {
-				payload = payload.substring(location_start);
-			} else {
-				payload = payload.substring(min((int)0,(int)(payload.length()-11)));
-			}
-		}
-		
-		if (location_start >=0 && location_end == -1) {
-			location_end = payload.indexOf("[");
-			if (location_end >= 0) {
-				// 0 kann nicht sein, da der String definitiv mit "Location:" anfängt
-				location = payload.substring(10, location_end -1);
-				len = 0;
-			}
-			// else
-			// wenn nicht gefunden, den Puffer nochmal auslesen und an die payload anhängen
-		}
-      }
-	  	  
-      //payload = http.getString();                  						//Get the response payload
-	  /*	  
-      location_start = payload.indexOf("Location: ");
-	  if (location_start >= 0) {
-		location_end = payload.indexOf("[",location_start);
-			
-		if (location_end>=0) {
-		  location = payload.substring(location_start+10, location_end -1);
-		} else {
-		  location = String("Fehler bei der Ortsbestimmung: Parsen - Unbekannter Ort<br>" + weatherstring + "<br>" + payload);
-		}
-	  } else {
-		location = String("Fehler bei der Ortsbestimmung: Unbekannter Ort<br>")  + weatherstring + String("<br>len(payload)=") + String(payload.length()) + String(" payload=") + payload + String("<br>ret=") + httpCode;
-	  }
-	  */
-	  
-	} else {
-	  Serial.print  ("ERROR getting TEMPERATURE: httpCode=");   Serial.println(httpCode);
-	  location = String("Fehler bei der Ortsbestimmung: Anfragefehler " + httpCode);
-    }
-
-    http.end();
-  }
-  
-  Serial.println(location);
-  
-  return location;
-}
-
-int GetTemperature() {
-  int httpCode;	
-  int temperature = ERR_TEMP; // is a kind of error code!
-  HTTPClient http;            //Declare object of class HTTPClient
-  String weatherstring;
-  String payload;
-  String temp_temperature;
-  
-  temperature_real_location = GetTemperatureRealLocation();
+	if ((b<0)||(b>100))
+		return;
 	
-  if (WiFi.status() == WL_CONNECTED) {                    						//Check WiFi connection status
-    weatherstring = "http://wttr.in/" + CONFIG.city + "?format=\%t";    //Specify request destination
-
-	Serial.println(weatherstring);
-	
-    http.begin(weatherstring);
-    httpCode = http.GET();
-
-    if (httpCode >= HTTP_CODE_OK) {
-      payload = http.getString();                  						//Get the response payload
-
-      temp_temperature = payload.substring(0, payload.length() - 4); 	//Format is "+x°C\n" wobei ° zwei Bytes einnimmt!
-
-      if ((temp_temperature.charAt(0) == '-') || (temp_temperature.charAt(0) == '+')) { 
-		temperature = temp_temperature.toInt();
-      }
-
-	  http.end();
-    } else {
-      Serial.print  ("ERROR getting TEMPERATURE: httpCode=");   Serial.println(httpCode);
-	  temperature_real_location = String("Fehler bei der Temperaturabfrage: Anfragefehler " + httpCode);
-
-      http.end();                                           						//Close connection
-    }
-
-  }
-  
-  Serial.println(temperature);
-  
-  //temperature_real_location = GetTemperatureRealLocation();
-  
-  return temperature;
+	FastLED.setBrightness((int)((float)b * 2.55));
 }
-
-#endif
 
 //
 // Ermittlung, ob die aktuelle Uhrzeit im Intervall zwischen dunkelschaltung_start und dunkelschaltung_end liegt
@@ -924,78 +436,12 @@ void setNumber(int n, CRGB c = CRGB::White) {
 
 }
 
-#ifdef GEBURTSTAGE
-bool isGeburtstagheut() {
-  int heute;
-
-  heute = heute_tag * 100 + heute_monat;
-
-  if ( heute == CONFIG.geb_1 || heute == CONFIG.geb_2 || heute == CONFIG.geb_3 || heute == CONFIG.geb_4 || heute == CONFIG.geb_5 )
-    return true;
-  else
-    return false;
-
-  return false;
-}
-
-String getGebName() {
-  int heute;
-
-  heute = heute_tag * 100 + heute_monat;
-
-  if ( heute == CONFIG.geb_1 ) return (CONFIG.geb_name_1);
-  if ( heute == CONFIG.geb_2 ) return (CONFIG.geb_name_2);
-  if ( heute == CONFIG.geb_3 ) return (CONFIG.geb_name_3);
-  if ( heute == CONFIG.geb_4 ) return (CONFIG.geb_name_4);
-  if ( heute == CONFIG.geb_5 ) return (CONFIG.geb_name_5);
-
-  return "";
-}
-
-void setRainbowColor() {
-  int i;
-  CHSV hsv;
-  CHSV hsv2;
-  int ini = false;
-
-
-  for (i = 0; i < NUM_LEDS; i++) {
-    if (mask[i]) {
-      if (!ini) {
-        ini = true;
-        hsv2 = rgb2hsv_approximate(leds[i]);
-        hsv.hue = hsv2.hue + 5; //deltahue
-        hsv.val = 255;
-        hsv.sat = 240;
-      }
-
-      leds[i] = hsv;
-      hsv.hue += 5; //deltahue
-    }
-  }
-}
-#endif
 
 void showWLAN(CRGB c) {
   resetLEDs();
   setWord(W_WLAN, c);
   FastLED.show();
 }
-
-#ifdef TEMPERATURE
-void showTemperature(int t, CRGB c) {
-
-  if (t < -39 || t > 39) return;
-
-  resetLEDs();
-
-  setWord(W_ES_IST, c);
-  setNumber(t, c);
-  setWord(W_GRAD, c);
-
-  FastLED.show();
-}
-#endif
 
 #ifdef LAUFSCHRIFT
 void startLaufschrift(String text, CRGB c = CRGB::White) {
@@ -1043,9 +489,56 @@ void showLaufschrift(String text, CRGB c = CRGB::White) {
 }
 #endif
 
-#ifdef HERZ
+bool getLocalTime(struct tm *info, uint32_t ms) {
+  uint32_t count = ms / 10;
+  time_t now;
+
+  time(&now);
+  localtime_r(&now, info);
+
+  if (info->tm_year > (2016 - 1900)) {
+    return true;
+  }
+
+  while (count--) {
+    delay(10);
+    time(&now);
+    localtime_r(&now, info);
+    if (info->tm_year > (2016 - 1900)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void GetZeit(int *stunden, int *minuten) {
+	struct tm tmstruct;
+	
+	getLocalTime(&tmstruct, 5000);
+	
+	*stunden = tmstruct.tm_hour;
+	*minuten = tmstruct.tm_min;
+}
+
+void GetDatum(int *tag, int *monat, int *jahr) {
+
+  struct tm tmstruct;
+
+  // Datum herausfinden
+  //configTime(3600 * CONFIG.timezone, 1 * 3600, "0.pool.ntp.org", "time.nist.gov", "1.pool.ntp.org");
+
+  //delay(2000);
+  //tmstruct.tm_year = 0;
+  getLocalTime(&tmstruct, 5000);
+  //Serial.printf("\nNow is : %d-%02d-%02d %02d:%02d:%02d\n", (tmstruct.tm_year) + 1900, (tmstruct.tm_mon) + 1, tmstruct.tm_mday, tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
+  //
+
+  *tag = tmstruct.tm_mday;
+  *monat = (tmstruct.tm_mon) + 1;
+  *jahr = (tmstruct.tm_year) + 1900;
+}
+
 void setHerz() {
-  int heute;
 
   switch (CONFIG.herz) {
   case HERZ_AUS:
@@ -1057,16 +550,12 @@ void setHerz() {
 		setWord(W_HERZ, CRGB::Red);
 		break;
   case HERZ_DATUM:
-		heute = heute_tag * 100 + heute_monat;
-
-		if (heute == CONFIG.dat_herz) {
+		if (heute_tag * 100 + heute_monat == CONFIG.dat_herz) {
 			setWord(W_HERZ, CRGB::Red);
 		}
 		break;
   case HERZ_STD_DATUM:
-		heute = heute_tag * 100 + heute_monat;
-
-		if (heute == CONFIG.dat_herz) {
+		if (heute_tag * 100 + heute_monat == CONFIG.dat_herz) {
 			setWord(W_HERZ, CRGB::Red);
 		} else {
 			setWord(W_HERZ, CONFIG.color_fg);
@@ -1074,9 +563,10 @@ void setHerz() {
 		break;
   }
 }
-#endif
   
-
+//
+//	Die Kernfunktion, Umwandeln der aktuellen Zeit in Worte und anzeigen
+//
 void showTime(int hour, int minute) {
   int singleMinute;
   if (hour == -1 || minute == -1) return;
@@ -1091,9 +581,7 @@ void showTime(int hour, int minute) {
 
   resetLEDs();
 
-#ifdef HERZ
   setHerz();
-#endif
 
   setWord(W_ES_IST, CONFIG.color_fg);
 
@@ -1116,421 +604,30 @@ void showTime(int hour, int minute) {
 }
 
 
-//
-// Funktionen rund um die Konfigurationsseite des eigenen Webservers
-//
-String pad(int value) {
-  if (value < 10) {
-    return "0" + String(value);
-  }
 
-  return String(value);
-}
-
-
-// Hauptformular
-//
-String getTimeForm() {
-  String content = "";
-  String label = "";
-
-  // Anzeigefarbe
-  content += "<div>";
-  content += "<label>Vordergrundfarbe</label>";
-  content += "<input name=\"fg\" value=\"#" + rgbToHex(CONFIG.color_fg) + "\" type=\"color\">";
-  content += "</div>";
-
-  // Hintergrundfarbe
-  content += "<div>";
-  content += "<label>Hintergrundfarbe</label>";
-  content += "<input name=\"bg\" value=\"#" + rgbToHex(CONFIG.color_bg) + "\" type=\"color\">";
-  content += "</div>";
-
-  // Helligkeit
-  content += "<div>";
-  content += "<label>Helligkeit (" + String(CONFIG.brightness) + "%)</label>";
-  content += "<input type=\"range\" name=\"brightness\" min=\"0\" max=\"100\" value=\"" + String(CONFIG.brightness) + "\">";
-  content += "</div>";
-
-  content += "<hr>";
-  
-  // Zeitzone
-  content += "<div>";
-  content += "<label>Zeitzone</label>";
-  content += "<select name=\"tz\">";
-
-  for (int i = -12; i < 13; i++) {
-    label = String(i);
-
-    if (i > 0) {
-      label = "+" + label;
-    }
-
-    content += htmlOption(label, String(i), String(CONFIG.timezone));
-  }
-  content += "</select>";
-  content += "</div>";
-
-
-#ifdef LOCALE
-  content += "<hr>";
-  
-  content += "<div>";
-  content += "<label>Region</label>";
-  content += "<select name=\"locale\">";
-  content += htmlOption(L_W_DEUTSCHLAND, String(L_DEUTSCHLAND), String(CONFIG.locale));
-  content += htmlOption(L_W_FRANKEN, String(L_FRANKEN), String(CONFIG.locale));
-  content += "</select>";
-  content += "</div>";
-#endif
-#ifdef HERZ
-  content += "<hr>";
-  
-  content += "<div>";
-  content += "<label>Herz</label>";
-  content += "<select class=\"time\" name=\"herz\" onchange=\"herzchanged\">";
-  content += htmlOption("Aus", String(HERZ_AUS), String(CONFIG.herz));
-  content += htmlOption("Standardfarbe", String(HERZ_AN), String(CONFIG.herz));
-  content += htmlOption("Rot", String(HERZ_ROT), String(CONFIG.herz));
-  content += htmlOption("Aus + Rot am Datum", String(HERZ_DATUM), String(CONFIG.herz));
-  content += htmlOption("Standardfarbe + Rot am Datum", String(HERZ_STD_DATUM), String(CONFIG.herz));
-  content += "</select>";
-  content += "<label>Datum (TTMM)</label>";
-  content += "<input name=\"dat_herz\" value=\"" + ((CONFIG.dat_herz>0)?String(CONFIG.dat_herz):String(" ")) + "\" maxlength=\"4\">";
-  content += "</div>";
-#endif
-
-#ifdef DUNKELSCHALTUNG
-  content += "<hr label=\"Dunkelschaltung\">";
-  content += "<div>";
-  content += "<label>Nachtmodus</label>";
-  content += "<input type=\"checkbox\" name=\"dunkelschaltung_active\" value=\"1\"";
-  if (CONFIG.dunkelschaltung_active) {
-    content += "checked";
-  };
-  content += ">";
-  content += "</div>";
-
-  // abgesenkte Helligkeit
-  content += "<div>";
-  content += "<label>reduzierte Helligkeit (" + String(CONFIG.dunkelschaltung_brightness) + "%)</label>";
-  content += "<input type=\"range\" name=\"dunkelschaltung_brightness\" min=\"0\" max=\"50\" value=\"" + String(CONFIG.dunkelschaltung_brightness) + "\">";
-  content += "</div>";
-
-  content += "<div>";
-  content += "<label>Nachtmodus Startzeit</label>";
-  content += "<select class=\"time\" name=\"dunkelschaltung_start\">";
-
-  for (int i = 0; i < 24; i++) {
-    content += htmlOption(pad(i) + ":00", String(i * 100), String(CONFIG.dunkelschaltung_start));
-    content += htmlOption(pad(i) + ":30", String(i * 100 + 30), String(CONFIG.dunkelschaltung_start));
-  }
-
-  content += "</select>";
-  content += "</div>";
-
-  content += "<div>";
-  content += "<label>Nachtmodus Endzeit</label>";
-  content += "<select class=\"time\" name=\"dunkelschaltung_end\">";
-
-  for (int i = 0; i < 24; i++) {
-    content += htmlOption(pad(i) + ":00", String(i * 100), String(CONFIG.dunkelschaltung_end));
-    content += htmlOption(pad(i) + ":30", String(i * 100 + 30), String(CONFIG.dunkelschaltung_end));
-  }
-
-  content += "</select>";
-  content += "</div>";
-#endif
-#ifdef TEMPERATURE
-
-  content += "<hr>";
-  
-  content += "<div>";
-  content += "<label>Temperaturanzeige</label>";
-  
-  content += "<select class=\"time\" name=\"temp_active\">";
-  content += htmlOption("Aus", String(0), String(CONFIG.temp_active));
-  content += htmlOption("Jede Minute", String(1), String(CONFIG.temp_active));
-  content += htmlOption("Jede 5. Minute", String(2), String(CONFIG.temp_active));
-  content += "</select>";
-  content += "</div>";
-
-  content += "<div>";
-  content += "<label>Ort</label>";
-  content += "<input name=\"city\" value=\"" + String(CONFIG.city) + "\">";
-  content += "<p style=\"font-size:0.75em;\">" + temperature_real_location + "</p>";
-  content += "</div>";
-#endif
-
-#ifdef GEBURTSTAGE
-  content += "<hr>";
-  
-  content += "<div>";
-  content += "<label>Name</label>";
-  content += "<input name=\"geb_name_1\" value=\"" + String(CONFIG.geb_name_1) + "\" maxlength=\"24\">";
-  content += "<label>Geburtstag (TTMM)</label>";
-  content += "<input name=\"geb_1\" value=\"" + ((CONFIG.geb_1>0)?String(CONFIG.geb_1):String(" ")) + "\" maxlength=\"4\">";
-  content += "</div>";
-
-  content += "<div>";
-  content += "<label>Name</label>";
-  content += "<input name=\"geb_name_2\" value=\"" + String(CONFIG.geb_name_2) + "\" maxlength=\"24\">";
-  content += "<label>Geburtstag (TTMM)</label>";
-  content += "<input name=\"geb_2\" value=\"" + ((CONFIG.geb_2>0)?String(CONFIG.geb_2):String(" ")) + "\" maxlength=\"4\">";
-  content += "</div>";
-
-  content += "<div>";
-  content += "<label>Name</label>";
-  content += "<input name=\"geb_name_3\" value=\"" + String(CONFIG.geb_name_3) + "\" maxlength=\"24\">";
-  content += "<label>Geburtstag (TTMM)</label>";
-  content += "<input name=\"geb_3\" value=\"" + ((CONFIG.geb_3>0)?String(CONFIG.geb_3):String(" ")) + "\" maxlength=\"4\">";
-  content += "</div>";
-
-  content += "<div>";
-  content += "<label>Name</label>";
-  content += "<input name=\"geb_name_4\" value=\"" + String(CONFIG.geb_name_4) + "\" maxlength=\"24\">";
-  content += "<label>Geburtstag (TTMM)</label>";
-  content += "<input name=\"geb_4\" value=\"" + ((CONFIG.geb_4>0)?String(CONFIG.geb_4):String(" ")) + "\" maxlength=\"4\">";
-  content += "</div>";
-
-  content += "<div>";
-  content += "<label>Name</label>";
-  content += "<input name=\"geb_name_5\" value=\"" + String(CONFIG.geb_name_5) + "\" maxlength=\"24\">";
-  content += "<label>Geburtstag (TTMM)</label>";
-  content += "<input name=\"geb_5\" value=\"" + ((CONFIG.geb_5>0)?String(CONFIG.geb_5):String(" ")) + "\" maxlength=\"4\">";
-  content += "</div>";
-#endif
-
-  return content;
-}
-String htmlOption(String label, String value, String store) {
-  String content = "<option value=\"" + value + "\"";
-
-  if (store == value) content += " selected=\"selected\"";
-
-  content += ">" + label + "</option>";
-
-  return content;
-}
-
-#ifdef LOCALE
 void changeLocale() {
 
   Serial.println("Locale=" + CONFIG.locale);
 
   if (CONFIG.locale == L_FRANKEN) {
     Serial.println(L_W_FRANKEN);
-    words_umschaltung_schwellwert = L_S_FRANKEN;
+    
+	words_umschaltung_schwellwert = L_S_FRANKEN;
     wordsindex_minutes[3] = W_VIERTEL;
     wordsindex_minutes[4] = W_ZEHN_VOR_HALB;
     wordsindex_minutes[8] = W_ZEHN_NACH_HALB;
     wordsindex_minutes[9] = W_DREIVIERTEL;
   }
   else {
-    words_umschaltung_schwellwert = L_S_DEUTSCHLAND;
     Serial.println(L_W_DEUTSCHLAND);
+	
+    words_umschaltung_schwellwert = L_S_DEUTSCHLAND;
     wordsindex_minutes[3] = W_VIERTEL_NACH;
     wordsindex_minutes[4] = W_ZWANZIG_NACH;
     wordsindex_minutes[8] = W_ZWANZIG_VOR;
     wordsindex_minutes[9] = W_VIERTEL_VOR;
   }
 }
-#endif
-
-
-void change() {
-
-  for (int i = 0; i < server.args(); i++)
-  {
-    Serial.println(server.argName(i) + " = " + server.arg(i));
-  }
-
-  if (server.hasArg("submit")) {
-
-    if (server.arg("submit") == "testPower") {
-		resetLEDs();
-		SetBrightness(100);
-		for (int i=0; i<NUM_LEDS; i++) {
-		  leds[i] = CRGB::White;
-		
-		  FastLED.show();
-		  
-		  delay(1000);
-		}
-		brightness=CONFIG.brightness;
-	}
-
-#ifdef LOCALE
-    else if (server.arg("submit") == "testLocale") {
-      for (int i = 0; i < 60; i++) {
-        showTime(12, i);
-        delay(250);
-      }
-    }
-#endif
-
-#ifdef TEMPERATURE
-    else if (server.arg("submit") == "testTemp") {
-		for (int i=-39; i<40; i++) {
-			showTemperature(i, GetTemperatureColor(i));
-			delay(250);
-		}
-	}
-#endif
-
-#ifdef LAUFSCHRIFT
-    else if (server.arg("submit") == "testLaufschrift") {
-		startLaufschrift("DIES IST EIN TEST.", CRGB::White);
-		
-		while (stepLaufschrift() != -1) {
-			delay(LAUFSCHRIFT_SPEED);
-		}
-		
-	}
-#endif
-    else if (server.arg("submit") == "ResetConfig") {
-      resetConfig();
-    }
-    else if (server.arg("submit") == "ResetWiFi") {
-      resetWiFi();
-    }
-    else if (server.arg("submit") == "ResetAll") {
-      resetAllAndReboot();
-    }
-    else if (server.arg("submit") == "save") {
-
-      if (server.hasArg("fg")) CONFIG.color_fg = hexToRgb(server.arg("fg"));
-      if (server.hasArg("bg")) CONFIG.color_bg = hexToRgb(server.arg("bg"));
-      if (server.hasArg("brightness")) CONFIG.brightness = server.arg("brightness").toInt();
-      if (server.hasArg("tz")) CONFIG.timezone = server.arg("tz").toInt();
-
-#ifdef DUNKELSCHALTUNG
-      CONFIG.dunkelschaltung_active = server.hasArg("dunkelschaltung_active");
-      if (server.hasArg("dunkelschaltung_start")) CONFIG.dunkelschaltung_start = server.arg("dunkelschaltung_start").toInt();
-      if (server.hasArg("dunkelschaltung_end")) CONFIG.dunkelschaltung_end = server.arg("dunkelschaltung_end").toInt();
-      if (server.hasArg("dunkelschaltung_brightness")) CONFIG.dunkelschaltung_brightness = server.arg("dunkelschaltung_brightness").toInt();
-#endif
-
-#ifdef TEMPERATURE
-      if (server.hasArg("temp_active")) CONFIG.temp_active = server.hasArg("temp_active");
-      if (server.hasArg("city"))        CONFIG.city        = server.arg("city");
-#endif
-
-#ifdef LOCALE
-      if (server.hasArg("locale")) CONFIG.locale = server.arg("locale").toInt();
-#endif
-
-#ifdef GEBURTSTAGE
-	  String s;
-	  
-      if (server.hasArg("geb_1")) CONFIG.geb_1 = server.arg("geb_1").toInt();
-      if (server.hasArg("geb_2")) CONFIG.geb_2 = server.arg("geb_2").toInt();
-      if (server.hasArg("geb_3")) CONFIG.geb_3 = server.arg("geb_3").toInt();
-      if (server.hasArg("geb_4")) CONFIG.geb_4 = server.arg("geb_4").toInt();
-      if (server.hasArg("geb_5")) CONFIG.geb_5 = server.arg("geb_5").toInt();
-      if (server.hasArg("geb_name_1")) { s = server.arg("geb_name_1"); s.toUpperCase();	CONFIG.geb_name_1 =  s; }
-      if (server.hasArg("geb_name_2")) { s = server.arg("geb_name_2"); s.toUpperCase();	CONFIG.geb_name_2 =  s; }
-      if (server.hasArg("geb_name_3")) { s = server.arg("geb_name_3"); s.toUpperCase();	CONFIG.geb_name_3 =  s; }
-      if (server.hasArg("geb_name_4")) { s = server.arg("geb_name_4"); s.toUpperCase();	CONFIG.geb_name_4 =  s; }
-      if (server.hasArg("geb_name_5")) { s = server.arg("geb_name_5"); s.toUpperCase();	CONFIG.geb_name_5 =  s; }
-#endif
-#ifdef HERZ
-	if (server.hasArg("herz")) CONFIG.herz = server.arg("herz").toInt();
-	if (server.hasArg("dat_herz")) CONFIG.dat_herz = server.arg("dat_herz").toInt();
-#endif
-
-#ifdef DUNKELSCHALTUNG
-	  if (jetztDunkelschaltung(hour, minute)) {
-		SetBrightness(CONFIG.dunkelschaltung_brightness);
-		Serial.print  ("Dunkelschaltung jetzt!"); Serial.println(brightness);
-	  } else {
-	    SetBrightness(CONFIG.brightness);
-      }
-#else
-	SetBrightness(CONFIG.brightness);
-#endif
-
-
-      saveConfig();
-      hour = -1;        // Zeitanzeige in loop() erzwingen
-
-      temperature = GetTemperature();
-      changeLocale();
-
-
-    }
-  }
-}
-
-void handleRootPath() {
-  String content = "";
-
-  change();
-
-  content += "<!DOCTYPE html><html>";
-  content += "<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">";
-  content += "<style>";
-  content += "* { box-sizing: border-box; }";
-  content += "html, body { font-family: Helvetica; margin: 0; padding: 0; }";
-  content += ".form { margin: auto; max-width: 400px; }";
-  content += ".form div { margin: 0; padding: 20px 0; width: 100%; font-size: 1.4rem; }";
-  content += "label { width: 60%; display: inline-block; margin: 0; vertical-align: middle; }";
-  content += "input, select { width: 38%; display: inline-block; margin: 0; border: 1px solid #eee; padding: 0; height: 40px; vertical-align: right; }";
-  content += "select.time { width: 18%; }";
-  content += "button { display: inline-block; width: 100%; font-size: 1.4rem; background-color: green; border: 1px solid #eee; color: #fff; padding-top: 10px; padding-bottom: 10px; }";
-  content += "button.danger { display: inline-block; width: 100%; font-size: 1.4rem; background-color: red; border: 1px solid #eee; color: #fff; padding-top: 10px; padding-bottom: 10px; }";
-  content += "</style>";
-  content += "</head>";
-  content += "<body>";
-
-
-
-  content += "<h1 align=center>WordClock Konfiguration</h1>";
-  content += "<form class=\"form\" method=\"post\" action=\"\">";
-  
-  content += "<div>";
-  content += getTimeForm();
-  content += "</div>";
-
-  content += "<div>";
-  content += "<button name=\"submit\" type=\"submit\" value=\"save\">Speichern</button>";
-  content += "</div>";
-  
-  content += "<hr label=\"Tests\">";
-  
-  content += "<div>";
-  content += "<button name=\"submit\" type=\"submit\" value=\"testLocale\">Test Region</button>";
-  content += "</div>";
-  content += "<div>";
-  content += "<button name=\"submit\" type=\"submit\" value=\"testTemp\">Test Temperatur</button>";
-  content += "</div>";
-  content += "<div>";
-  content += "<button name=\"submit\" type=\"submit\" value=\"testLaufschrift\">Test Laufschrift</button>";
-  content += "</div>";
-  content += "<div>";
-  content += "<button name=\"submit\" type=\"submit\" value=\"testPower\">Test Stromverbrauch</button>";
-  content += "</div>";
-  
-  content += "<hr label=\"Zurücksetzen\">";
-  
-  content += "<div>";
-  content += "<button name=\"submit\" type=\"submit\" class=\"danger\" value=\"ResetConfig\" background-color=\"red\";>Konfiguration zur&uuml;cksetzen</button>";
-  content += "</div>";
-  content += "<div>";
-  content += "<button name=\"submit\" type=\"submit\" class=\"danger\" value=\"ResetWiFi\" background-color: red;>WLAN-Parameter zur&uuml;cksetzen</button>";
-  content += "</div>";
-  content += "<div>";
-  content += "<button name=\"submit\" type=\"submit\" class=\"danger\" value=\"ResetAll\" background-color: red;>Komplett zur&uuml;cksetzen und Reboot</button>";
-  content += "</div>";
-
-  content += "</form>";
-  content += "</body></html>";
-
-  server.sendHeader("Location", "http://" + ip);
-  server.send(200, "text/html", content);
-
-}
-
 
 void showIP(String sIP) {
 
@@ -1567,6 +664,7 @@ void showIP(String sIP) {
 }
 
 
+
 //gets called when WiFiManager enters configuration mode
 void configModeCallback (WiFiManager *myWiFiManager) {
   showWLAN(CRGB::Yellow);
@@ -1579,52 +677,10 @@ void configModeCallback (WiFiManager *myWiFiManager) {
 
 }
 
-#ifdef GEBURTSTAGE
-bool getLocalTime(struct tm * info, uint32_t ms) {
-  uint32_t count = ms / 10;
-  time_t now;
-
-  time(&now);
-  localtime_r(&now, info);
-
-  if (info->tm_year > (2016 - 1900)) {
-    return true;
-  }
-
-  while (count--) {
-    delay(10);
-    time(&now);
-    localtime_r(&now, info);
-    if (info->tm_year > (2016 - 1900)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-void GetDatum(int *tag, int *monat, int *jahr) {
-
-  struct tm tmstruct;
-
-  // Datum herausfinden
-  configTime(3600 * CONFIG.timezone, 1 * 3600, "0.pool.ntp.org", "time.nist.gov", "1.pool.ntp.org");
-
-  delay(2000);
-  tmstruct.tm_year = 0;
-  getLocalTime(&tmstruct, 5000);
-  Serial.printf("\nNow is : %d-%02d-%02d %02d:%02d:%02d\n", (tmstruct.tm_year) + 1900, (tmstruct.tm_mon) + 1, tmstruct.tm_mday, tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
-  //
-
-  *tag = tmstruct.tm_mday;
-  *monat = (tmstruct.tm_mon) + 1;
-  *jahr = (tmstruct.tm_year) + 1900;
-}
-#endif
 
 void setup() {
   IPAddress ipL;
-
-  Serial.begin(74880);
+    Serial.begin(74880);
 
 
 #ifdef GEBURTSTAGE
@@ -1633,20 +689,11 @@ void setup() {
 #ifdef LAUFSCHRIFT
   Serial.println("Feature Laufschrift enabled!");
 #endif
-#ifdef LOCALE
-  Serial.println("Feature Lokalisierung enabled!");
-#endif
 #ifdef TEMPERATURE
   Serial.println("Feature Temperaturanzeige enabled!");
 #endif
 #ifdef FEATURE_OTA
   Serial.println("Feature OTA enabled!");
-#endif
-#ifdef DUNKELSCHALTUNG
-  Serial.println("Feature Dunkelschaltung enabled!");
-#endif
-#ifdef HERZ
-  Serial.println("Feature Herz enabled!");
 #endif
 
 
@@ -1669,10 +716,7 @@ void setup() {
 #endif
 
   // initiale Helligkeit setzen
-  SetBrightness(brightness);
-  
-  
-  
+  SetBrightness(BRIGHTNESS_DEFAULT);
   
   
   // WLAN-Konfiguration
@@ -1694,7 +738,7 @@ void setup() {
 
   ipL = WiFi.localIP();
   ip = ipL.toString();
-  showIP(ip);
+  showIP(ipL.toString());
   // WLAN passt
 
 
@@ -1752,176 +796,251 @@ void setup() {
 #endif
 
   // start webserver
-  server.on("/", handleRootPath);
-  server.begin();
+  startServer();
 
   // start time-service
-  timeClient.begin();
-  timeClient.update();
+  //timeClient.begin();
+  //timeClient.update();
 
-#ifdef GEBURTSTAGE
-  GetDatum(&heute_tag, &heute_monat, &heute_jahr);
-#endif
-}
-
-void setMode(int i) {
-	Serial.println(String("setMode alt=") + String(mymode) + String(" neu=") + String(i));
-	mymode = i;
+  configTime(3600 * CONFIG.timezone, 1 * 3600, "0.pool.ntp.org", "time.nist.gov", "1.pool.ntp.org");
+  
+	heute_tag = -1;
+	myMode = MODE_TEMP;			// aktueller Anzeigemodus für den Zustandsautomaten
+	mode_change = true;
+	temperature = ERR_TEMP;
 }
 
 void loop() {
+	int h;
+	int m;
+	unsigned long jetzt;
 
-  unsigned long jetzt;
+	//Serial.println("Start Loop - MODE " + String(myMode) + " mode_change=" + String(mode_change));
+	//
+	// Zeit aktualisieren
+	//
+	//timeClient.update();
+	//h = timeClient.getHours();
+	//m = timeClient.getMinutes();
+	
+	GetZeit(&h, &m);
 
-#ifdef FEATURE_OTA
-  ArduinoOTA.handle();	
-#endif
- 
- // Zeit aktualisieren
-  
-  timeClient.update();
-
-  int h = timeClient.getHours();
-  int m = timeClient.getMinutes();
-
-#ifdef GEBURTSTAGE
-  // Datum ermitteln, wenn es 0-Uhr ist, oder das Datum unbekannt ist
+	//
+	// Datum ermitteln, wenn es 0-Uhr ist, oder das Datum unbekannt ist
+	//
     if ((h == 0 && m == 0) || heute_tag == -1 || heute_monat == -1 || heute_jahr == -1 ) {
       // einmal pro Tag das Datum holen, oder wenn einer der heute_*-Werte unbestimmt ist
       GetDatum(&heute_tag, &heute_monat, &heute_jahr);
+	  Serial.println("Neues Datum geholt " + String(heute_tag) + "." + String(heute_monat) + "." + String(heute_jahr));
     }
-#endif
 
+	//Serial.println("Loop 1 - MODE " + String(myMode) + " mode_change=" + String(mode_change));
 
+	//
+	// Diese Aktionen sollten nur noch einmal pro Minute laufen
+	//
+	if (h != hour || m != minute) {
+		// neue Minute
+
+		hour = h;
+		minute = m;
+
+		// wir starten mit der Temperatur....
+		myMode = MODE_TEMP;
+		mode_change = true;
+		
+		// Falls gerade die Dunkelschaltung erfolgt...
+		SetBrightness(BRIGHTNESS_AUTO);
+		
+		Serial.println("Neue Minute " + String(minute));
+	}
+	
+	// Serial.println("Loop 2 - MODE " + String(myMode) + " mode_change=" + String(mode_change));
+	
 #ifdef TEMPERATURE
-  // Temperatur alle 15 Minuten aktualisieren, oder falls keine Temperatur ermittelt werden konnte
-  if (CONFIG.temp_active != 0 && (m == 0 || m == 15 || m == 30 || m == 45 || temperature == ERR_TEMP)) {
-    temperature = GetTemperature();
-  }
+	//
+	// Temperatur alle 15 Minuten aktualisieren, oder falls keine Temperatur ermittelt werden konnte
+	//
+	if (CONFIG.temp_active != TEMPERATURE_AUS  && (minute == 0 || minute == 15 || minute == 30 || minute == 45 || temperature == ERR_TEMP) && temperatur_minute != minute) {
+		temperatur_minute = minute;
+		temperature = GetTemperature(CONFIG.city);
+	}
 #endif  
   
+	//Serial.println("Loop 3 - MODE " + String(myMode) + " mode_change=" + String(mode_change));
 
-#ifdef DUNKELSCHALTUNG
-  if (jetztDunkelschaltung(hour, minute)) {
-	SetBrightness(CONFIG.dunkelschaltung_brightness);
-	//Serial.print  ("Dunkelschaltung jetzt!"); Serial.println(brightness);
-  } else {
-	SetBrightness(CONFIG.brightness);
-  }
+	
+	if (mode_change == true) {
+		
+		mode_change = false;
+		
+		Serial.println("ModeChange " + String(myMode));
+		
+		switch (myMode) {
+			
+		case MODE_TIME:
+
+			showTime(hour,	minute);
+		break;
+		
+#ifdef GEBURTSTAGE
+		case MODE_BIRTHDAY:
+#ifdef LAUFSCHRIFT
+			if (isGeburtstagheut(heute_tag, heute_monat) && ((m % 5) == 0)) {
+				
+				
+				Serial.println("Starte Geburtstag");
+				
+				// Zu dieser Minute ist die Geburtstagslaufschrift noch nicht erschienen
+				// und es gibt einen Geburtstag
+				startLaufschrift("HAPPY BIRTHDAY," + getGebName(heute_tag, heute_monat) + "!");
+				geburtstag_ende = false;
+				geburtstag_minute = m;
+				geburtstag_millis= millis();
+			}
 #else
-	SetBrightness(CONFIG.brightness);
+			// Wenn keine Geburtstagslaufschrift, dann durchschalten auf MODE_TIME_TIME
+			// myMode = MODE_TIME;
+			// Serial.println("MODE_TIME");
+			// mode_change = true;
+			
 #endif
-
-
-  switch (mymode) {
+			break;
+ 
+#endif
 
 #ifdef TEMPERATURE
-  case MODE_TEMP:
-	// Temperatur ist angezeigt worden,
-	//		zur Minute temperatur_minute
-	//		und getstartet um temperatur_millis
-	// 	Ausschalten nach x Milisekunden
-	jetzt = millis();
-	
-	if (jetzt>temperatur_millis+TEMPERATURE_DURATION || jetzt < temperatur_millis) {
+		case MODE_TEMP:
+			//
+			// Auf Temperaturanzeige umschalten, wenn eine Temperatur ermittelt wurde, Temperaturanzeige aktiv ist und zu dieser Minute noch keine Temperatur angezeigt wurde
+			// temperatur_minute ist die Zeit zu der zuletzt die Temperatur angezeigt wurde
+			//
+			Serial.println("TEMP: " + String(minute) + " CONFIG.temp_active=" + String(CONFIG.temp_active));
+			
+			if (	CONFIG.temp_active == TEMPERATURE_MINUTE 
+				|| (CONFIG.temp_active == TEMPERATURE_5MINUTE && ((minute%5)==0))
+				) {
+				// temperaturanzeige starten
+				temperatur_minute = minute;
+				temperatur_millis = millis();
+
+				showTemperature(temperature, GetTemperatureColor(temperature));
+				// Temperaturanzeige wird in mode_temperatur beendet
+			} 
+			else {
+				// zu dieser Minute keine Temperaturanzeige
 #ifdef GEBURTSTAGE
-		setMode(MODE_BIRTHDAY);
+				myMode = MODE_BIRTHDAY;
+				Serial.println("MODE_BIRTHDAY");
+				mode_change = true;
 #else
-		setMode(MODE_TIME);
-		hour = -1;			// Zeitanzeige erzwingen, falls wieder MODE_TIME
-#endif
+				myMode = MODE_TIME;
+				Serial.println("MODE_TIME");
+				mode_change = true;
+#endif				
+			}
+			
+			break;
+#endif	
+		default:
+
+			showTime(hour,	minute);
+		break;
+		
+		}
 	}
 	else {
-		;	// nix tun, nur auf den nächsten Durchlauf warten
-	}
-	
-	break;
-#endif
-
-#ifdef GEBURTSTAGE
-  case MODE_BIRTHDAY:
-#ifdef LAUFSCHRIFT
-	if (isGeburtstagheut() && ((m % 5) == 0)) {
-		if (m != geburtstag_minute ) {
-			
-			Serial.println("Starte Geburtstag");
-			
-			// Zu dieser Minute ist die Geburtstagslaufschrift noch nicht erschienen
-			// und es gibt einen Geburtstag
-			startLaufschrift("HAPPY BIRTHDAY," + getGebName() + "!");
-			geburtstag_ende = 0;
-			geburtstag_minute = m;
-			geburtstag_millis= millis();
-		}
 		
-		if (m == geburtstag_minute && geburtstag_ende != -1) {
+		//Serial.println("No Mode Change " + String(myMode) + " mode_change=" + String(mode_change));
+		
+		// Diese Aktionen werden durchlaufen, solange der Modus unverändert ist
+		//
+		switch (myMode) {
+			
+		case MODE_TIME:
+			// Nix tun. Die Zeit sollte bereits angezeigt werden und dann warten, auf eine neue Minute
+			break;
+			
+#ifdef TEMPERATURE
+		case MODE_TEMP:
+			// Temperatur ist angezeigt worden,
+			//		zur Minute temperatur_minute
+			//		und getstartet um temperatur_millis
+			// 	Ausschalten nach x Milisekunden
 			jetzt = millis();
 			
-			Serial.println("Warte Geburtstag");
-			
-			if (jetzt>geburtstag_millis+LAUFSCHRIFT_SPEED || jetzt < geburtstag_millis) {
-				//einen Schritt in der Laufschrift
-				geburtstag_ende = stepLaufschrift();
-				geburtstag_millis = jetzt;
-			
-				if (geburtstag_ende == -1) {
-					setMode(MODE_TIME);
-					hour = -1;
-				}
+
+			if (jetzt>temperatur_millis+TEMPERATURE_DURATION || jetzt < temperatur_millis) {
+				Serial.println("Ende Temp");			
+#ifdef GEBURTSTAGE
+				myMode = MODE_BIRTHDAY;
+				Serial.println("MODE_BIRTHDAY");
+				mode_change = true;
+#else
+				myMode = MODE_TIME;
+				Serial.println("MODE_TIME");
+				mode_change = true;
+#endif
 			}
+			else {
+				;	// nix tun, nur auf den nächsten Durchlauf warten, die Temperatur wird angezeigt, aber die Zeit TEMPERATURE_DURATION ist noch nicht abgelaufen
+			}
+			
+			break;
+#endif
+		
+#ifdef GEBURTSTAGE
+		case MODE_BIRTHDAY:
+		
+		
+			if (!geburtstag_ende) {
+				jetzt = millis();
+				
+				Serial.println("Warte Geburtstag " + String(jetzt) + " geburtstag_millis=" + String(geburtstag_millis) + " Diff=" + String(jetzt - geburtstag_millis));
+				
+				if (jetzt>geburtstag_millis+LAUFSCHRIFT_SPEED || jetzt < geburtstag_millis) {
+					//einen Schritt in der Laufschrift
+					geburtstag_ende = stepLaufschrift();
+					geburtstag_millis = jetzt;
+				
+				}
+			} 
+			else {
+				Serial.println("Ende Geburtstag");		
+				myMode = MODE_TIME;
+				Serial.println("MODE_TIME");
+				mode_change = true;
+				//hour = -1;
+			}
+			break;
+#endif
 		}
 	}
-	else {
-		setMode(MODE_TIME);
-		hour = -1;
+	
+	
+	//
+	// Diese Aktionen bei jedem Schleifendurchlauf
+	//
+#ifdef GEBURTSTAGE
+	if (isGeburtstagheut(heute_tag, heute_monat) && myMode == MODE_TIME) {
+		EVERY_N_MILLISECONDS( 50 ) {
+			setRainbowColor();
+			FastLED.show();
+		}
 	}
 #endif
-#else
-	setMode(MODE_TIME);
-	hour = -1;
-	break;
+ 
+	//
+	// evtl. Update Einspielen
+	//
+#ifdef FEATURE_OTA
+	ArduinoOTA.handle();	
 #endif
-
-  case MODE_TIME:
-  	if (h != hour || m != minute) {
-	  // neue Minute
-
-      hour = h;
-      minute = m;
-
-#ifdef TEMPERATURE
-	  //
-	  // Auf Temperaturanzeige umschalten, wenn eine Temperatur ermittelt wurde, Temperaturanzeige aktiv ist und zu dieser Minute noch keine Temperatur angezeigt wurde
-	  if (m != temperatur_minute && (CONFIG.temp_active == TEMPERATURE_MINUTE || (CONFIG.temp_active == TEMPERATURE_5MINUTE && ((m%5)==0))) && temperature != ERR_TEMP && temperature != -1) {
-		// temperaturanzeige starten
-		temperatur_minute = m;
-		temperatur_millis = millis();
-		setMode(MODE_TEMP);
-	    showTemperature(temperature, GetTemperatureColor(temperature));
-		// Temperaturanzeige wird in mode_temperatur beendet
-      }
-	  else {
-        showTime(hour, minute);
-	  }
-#else
-#ifdef GEBURTSTAGE
-      setMode(MODE_GEBURTSTAGE);
-#else	
-	  showTime(hour, minute);
-#endif
-#endif
-    }
-
-#ifdef GEBURTSTAGE
-    if (isGeburtstagheut() && mymode == MODE_TIME) {
-      EVERY_N_MILLISECONDS( 50 ) {
-        setRainbowColor();
-        FastLED.show();
-      }
-    }
-	break;
-#endif
-  }
-  
-  server.handleClient();
+ 
+	//
+	// Webserver bedienen
+	//
+	handleClientServer(); 
+	
+	//Serial.println("Ende Loop - MODE " + String(myMode) + " mode_change=" + String(mode_change));
 }
