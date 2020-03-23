@@ -13,11 +13,12 @@
 #define TEMPERATURE_DURATION 	5000
 
 #ifdef TEMPERATUR_CPP
-int temperature = ERR_TEMP;  // temperatur
-String temperature_real_location;	// von wttr.in tatsächlich genutzter Ort, zur Ausgabe auf der Webseite
+
 #else
 extern int temperature;
 extern String temperature_real_location;
+
+extern void testTemperatur();
 
 extern CRGB GetTemperatureColor(int t);
 

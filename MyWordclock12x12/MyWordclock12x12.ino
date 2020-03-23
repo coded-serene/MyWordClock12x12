@@ -70,13 +70,15 @@ cLEDText ScrollingMsg;
 char buffer[256];
 #endif
 
-
+//
+// exportierte Variable
+//
 CRGB leds[NUM_LEDS];
 config_t CONFIG;
 String ip;
 
 //
-// Modulvariable
+// lokale Modulvariable
 //
 int hour = -1;
 int minute = -1;
@@ -108,19 +110,33 @@ WiFiManager wifiManager;
 
 
 //
-// Funktionen zum WiFi-Betrieb
 //
-void resetWiFi() {
-  wifiManager.resetSettings();
-}
-void resetConfig() {
-  SPIFFS.remove(CONFIGFILE);
-}
-void resetAllAndReboot() {
-  resetConfig();
-  resetWiFi();
-  ESP.reset();
-  delay(5000);
+//
+//
+
+
+void changeLocale() {
+
+  Serial.println("Locale=" + CONFIG.locale);
+
+  if (CONFIG.locale == L_FRANKEN) {
+    Serial.println(L_W_FRANKEN);
+    
+	words_umschaltung_schwellwert = L_S_FRANKEN;
+    wordsindex_minutes[3] = W_VIERTEL;
+    wordsindex_minutes[4] = W_ZEHN_VOR_HALB;
+    wordsindex_minutes[8] = W_ZEHN_NACH_HALB;
+    wordsindex_minutes[9] = W_DREIVIERTEL;
+  }
+  else {
+    Serial.println(L_W_DEUTSCHLAND);
+	
+    words_umschaltung_schwellwert = L_S_DEUTSCHLAND;
+    wordsindex_minutes[3] = W_VIERTEL_NACH;
+    wordsindex_minutes[4] = W_ZWANZIG_NACH;
+    wordsindex_minutes[8] = W_ZWANZIG_VOR;
+    wordsindex_minutes[9] = W_VIERTEL_VOR;
+  }
 }
 
 
@@ -206,7 +222,7 @@ void loadConfig() {
   CONFIG.dunkelschaltung_end 		= doc["dunkelschaltung_end"].as<int>();
   CONFIG.dunkelschaltung_brightness	= doc["dunkelschaltung_brightness"].as<int>();
 
-  SetBrightness(BRIGHTNESS_AUTO);
+  setBrightness(BRIGHTNESS_AUTO);
 
 #ifdef TEMPERATURE
   CONFIG.temp_active 				= doc["temp_active"].as<int>();
@@ -293,18 +309,31 @@ void saveConfig() {
   file.close();
 }
 
-// Setzen der Helligkeit in %
-//
-void SetBrightness(int b) {
 
-	if (b == BRIGHTNESS_AUTO) {
-		b = (jetztDunkelschaltung(hour, minute)) ? CONFIG.dunkelschaltung_brightness : CONFIG.brightness;
+// Testfunktionen für den LED-Streifen
+//
+void testPower() {
+
+	resetLEDs();
+
+	setBrightness(BRIGHTNESS_MAX);
+
+	for (int i=0; i<NUM_LEDS; i++) {
+	  leds[i] = CRGB::White;
+	
+	  FastLED.show();
+	  
+	  delay(1000);
 	}
-	
-	if ((b<0)||(b>100))
-		return;
-	
-	FastLED.setBrightness((int)((float)b * 2.55));
+
+	setBrightness(BRIGHTNESS_AUTO);
+}
+
+void testLocale() {
+	for (int i = 0; i < 60; i++) {
+		showTime(12, i);
+		delay(500);
+	}
 }
 
 //
@@ -334,6 +363,59 @@ bool jetztDunkelschaltung(int hour, int minute) {
   return false;
 }
 
+//
+// Zeitfunktionen
+//
+bool getLocalTime(struct tm *info, uint32_t ms) {
+  uint32_t count = ms / 10;
+  time_t now;
+
+  time(&now);
+  localtime_r(&now, info);
+
+  if (info->tm_year > (2016 - 1900)) {
+    return true;
+  }
+
+  while (count--) {
+    delay(10);
+    time(&now);
+    localtime_r(&now, info);
+    if (info->tm_year > (2016 - 1900)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void GetZeit(int *stunden, int *minuten) {
+	struct tm tmstruct;
+	
+	getLocalTime(&tmstruct, 5000);
+	
+	*stunden = tmstruct.tm_hour;
+	*minuten = tmstruct.tm_min;
+}
+
+void GetDatum(int *tag, int *monat, int *jahr) {
+
+  struct tm tmstruct;
+
+  // Datum herausfinden
+  //configTime(3600 * CONFIG.timezone, 1 * 3600, "0.pool.ntp.org", "time.nist.gov", "1.pool.ntp.org");
+
+  //delay(2000);
+  //tmstruct.tm_year = 0;
+  getLocalTime(&tmstruct, 5000);
+  //Serial.printf("\nNow is : %d-%02d-%02d %02d:%02d:%02d\n", (tmstruct.tm_year) + 1900, (tmstruct.tm_mon) + 1, tmstruct.tm_mday, tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
+  //
+
+  *tag = tmstruct.tm_mday;
+  *monat = (tmstruct.tm_mon) + 1;
+  *jahr = (tmstruct.tm_year) + 1900;
+}
+
+
 // Funktionen zum Arbeiten mit dem LED-Streifen
 //
 // set-Funktionen setzen nur die Informationen im Array für die LEDs
@@ -341,6 +423,22 @@ bool jetztDunkelschaltung(int hour, int minute) {
 //
 // alle LEDs auf Hintergrundfarbe setzen
 //
+
+// Setzen der Helligkeit in %
+//
+void setBrightness(int b) {
+
+	if (b == BRIGHTNESS_AUTO) {
+		b = (jetztDunkelschaltung(hour, minute)) ? CONFIG.dunkelschaltung_brightness : CONFIG.brightness;
+	}
+	
+	if ((b<0)||(b>100))
+		return;
+	
+	FastLED.setBrightness((int)((float)b * 2.55));
+}
+
+
 void resetLEDs() {
   int i;
 
@@ -370,15 +468,6 @@ void setWord(int word, CRGB col = CRGB::White) {
 #endif
     i++;
   };
-}
-
-//
-// Ein einzelnes Wort aus der Worttabelle setzen und anzeigen lassen
-//
-void showWord(int w, CRGB c = CRGB::White) {
-  resetLEDs();
-  setWord(w, c);
-  FastLED.show();
 }
 
 
@@ -437,12 +526,6 @@ void setNumber(int n, CRGB c = CRGB::White) {
 }
 
 
-void showWLAN(CRGB c) {
-  resetLEDs();
-  setWord(W_WLAN, c);
-  FastLED.show();
-}
-
 #ifdef LAUFSCHRIFT
 void startLaufschrift(String text, CRGB c = CRGB::White) {
   text = "   " + text;      // smooth in
@@ -487,56 +570,15 @@ void showLaufschrift(String text, CRGB c = CRGB::White) {
     delay(LAUFSCHRIFT_SPEED);
   }
 }
+
+void testLaufschrift() {
+	startLaufschrift("DIES IST EIN TEST.", CRGB::White);
+
+	while (stepLaufschrift() != -1) {
+		delay(LAUFSCHRIFT_SPEED);
+	}
+}
 #endif
-
-bool getLocalTime(struct tm *info, uint32_t ms) {
-  uint32_t count = ms / 10;
-  time_t now;
-
-  time(&now);
-  localtime_r(&now, info);
-
-  if (info->tm_year > (2016 - 1900)) {
-    return true;
-  }
-
-  while (count--) {
-    delay(10);
-    time(&now);
-    localtime_r(&now, info);
-    if (info->tm_year > (2016 - 1900)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-void GetZeit(int *stunden, int *minuten) {
-	struct tm tmstruct;
-	
-	getLocalTime(&tmstruct, 5000);
-	
-	*stunden = tmstruct.tm_hour;
-	*minuten = tmstruct.tm_min;
-}
-
-void GetDatum(int *tag, int *monat, int *jahr) {
-
-  struct tm tmstruct;
-
-  // Datum herausfinden
-  //configTime(3600 * CONFIG.timezone, 1 * 3600, "0.pool.ntp.org", "time.nist.gov", "1.pool.ntp.org");
-
-  //delay(2000);
-  //tmstruct.tm_year = 0;
-  getLocalTime(&tmstruct, 5000);
-  //Serial.printf("\nNow is : %d-%02d-%02d %02d:%02d:%02d\n", (tmstruct.tm_year) + 1900, (tmstruct.tm_mon) + 1, tmstruct.tm_mday, tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
-  //
-
-  *tag = tmstruct.tm_mday;
-  *monat = (tmstruct.tm_mon) + 1;
-  *jahr = (tmstruct.tm_year) + 1900;
-}
 
 void setHerz() {
 
@@ -563,7 +605,23 @@ void setHerz() {
 		break;
   }
 }
+
+
+//
+// Ein einzelnes Wort aus der Worttabelle setzen und anzeigen lassen
+//
+void showWord(int w, CRGB c = CRGB::White) {
+  resetLEDs();
+  setWord(w, c);
+  FastLED.show();
+}
   
+void showWLAN(CRGB c) {
+  resetLEDs();
+  setWord(W_WLAN, c);
+  FastLED.show();
+}
+
 //
 //	Die Kernfunktion, Umwandeln der aktuellen Zeit in Worte und anzeigen
 //
@@ -604,80 +662,94 @@ void showTime(int hour, int minute) {
 }
 
 
-
-void changeLocale() {
-
-  Serial.println("Locale=" + CONFIG.locale);
-
-  if (CONFIG.locale == L_FRANKEN) {
-    Serial.println(L_W_FRANKEN);
-    
-	words_umschaltung_schwellwert = L_S_FRANKEN;
-    wordsindex_minutes[3] = W_VIERTEL;
-    wordsindex_minutes[4] = W_ZEHN_VOR_HALB;
-    wordsindex_minutes[8] = W_ZEHN_NACH_HALB;
-    wordsindex_minutes[9] = W_DREIVIERTEL;
-  }
-  else {
-    Serial.println(L_W_DEUTSCHLAND);
-	
-    words_umschaltung_schwellwert = L_S_DEUTSCHLAND;
-    wordsindex_minutes[3] = W_VIERTEL_NACH;
-    wordsindex_minutes[4] = W_ZWANZIG_NACH;
-    wordsindex_minutes[8] = W_ZWANZIG_VOR;
-    wordsindex_minutes[9] = W_VIERTEL_VOR;
-  }
-}
-
 void showIP(String sIP) {
 
-  if (sIP == NULL) return;
+	if (sIP == NULL) return;
 
 #ifdef LAUFSCHRIFT
-  showLaufschrift("WLAN: " + sIP);
+	showLaufschrift("WLAN: " + sIP);
 #else
-  for (unsigned int i = 0; i < sIP.length(); ++i) {
-    resetLEDs();
-    switch ((char)sIP[i]) {
-      case '0':
-      case '1':
-      case '2':
-      case '3':
-      case '4':
-      case '5':
-      case '6':
-      case '7':
-      case '8':
-      case '9':
-        setWord(wordsindex_hours[(int)((char)sIP[i] - '0')], CRGB::Blue);
-        break;
-      case '.':
-        setWord(W_PUNKT, CRGB::Blue);
-        break;
-      default:
-        break;
-    }
-    FastLED.show();
-    delay(1500);
-  }
+	for (unsigned int i = 0; i < sIP.length(); ++i) {
+		resetLEDs();
+		switch ((char)sIP[i]) {
+			case '0':
+			case '1':
+			case '2':
+			case '3':
+			case '4':
+			case '5':
+			case '6':
+			case '7':
+			case '8':
+			case '9':
+				setWord(wordsindex_hours[(int)((char)sIP[i] - '0')], CRGB::Blue);
+				break;
+			case '.':
+				setWord(W_PUNKT, CRGB::Blue);
+				break;
+			default:
+				break;
+		}
+		FastLED.show();
+		delay(1500);
+	}
 #endif
 }
 
 
+//
+// Funktionen zum WiFi-Betrieb
+//
+void resetWiFi() {
+  wifiManager.resetSettings();
+}
+void resetConfig() {
+  SPIFFS.remove(CONFIGFILE);
+}
+void resetAllAndReboot() {
+  resetConfig();
+  resetWiFi();
+  ESP.reset();
+  delay(5000);
+}
 
 //gets called when WiFiManager enters configuration mode
 void configModeCallback (WiFiManager *myWiFiManager) {
-  showWLAN(CRGB::Yellow);
+	showWLAN(CRGB::Yellow);
 
-  Serial.println("WiFiManager Entered config mode");
-  Serial.println(WiFi.softAPIP());
-  //if you used auto generated SSID, print it
-  Serial.println(myWiFiManager->getConfigPortalSSID());
-  //entered config mode, make led toggle faster
-
+	Serial.println("WiFiManager Entered config mode");
+	Serial.println(WiFi.softAPIP());
+	//if you used auto generated SSID, print it
+	Serial.println(myWiFiManager->getConfigPortalSSID());
+	//entered config mode, make led toggle faster
 }
 
 
+//
+// evtl hat sich ein Parameter geändert. Dann die Anzeige neu initialisieren
+//
+void restart() {
+	// evtl. haben wir eine neue Zeitzone....
+	configTime(3600 * CONFIG.timezone, 1 * 3600, "0.pool.ntp.org", "time.nist.gov", "1.pool.ntp.org");
+
+	// evtl. geaenderte Helligkeit durchsetzen
+	setBrightness(BRIGHTNESS_AUTO);
+
+#ifdef TEMPERATURE	
+	// evtl. wurde der Ort geaendert, also sicherheitshalber die Temperatur neu holen
+	temperature = GetTemperature(CONFIG.city);
+#endif
+	
+	// vllt. ist die Regionaleinstellung geändert...
+	changeLocale();
+	
+	// Zeitanzeige in loop() erzwingen
+	hour = -1;
+}
+
+//
+// Initialisierung
+//
 void setup() {
   IPAddress ipL;
     Serial.begin(74880);
@@ -697,117 +769,122 @@ void setup() {
 #endif
 
 
-  // Dateisystem initialisieren
-  SPIFFS.begin();
+	// Dateisystem initialisieren
+	SPIFFS.begin();
 
-  // Konfiguration laden
-  loadConfig();
+	// Konfiguration laden
+	loadConfig();
 
-  // LEDstreifen anhängen
-  FastLED.addLeds<WS2812B, DATA_PIN, LEDCOLORORDER>(leds, NUM_LEDS);
-
-
+	// LEDstreifen anhängen
+	FastLED.addLeds<WS2812B, DATA_PIN, LEDCOLORORDER>(leds, NUM_LEDS);
 
 #ifdef LAUFSCHRIFT
-  mleds.SetLEDArray(&leds[0]);
+	mleds.SetLEDArray(&leds[0]);
 
-  ScrollingMsg.SetFont(MatriseFontData);
-  ScrollingMsg.Init(&mleds, mleds.Width(), ScrollingMsg.FontHeight() + 1, 0, 0);
+	ScrollingMsg.SetFont(MatriseFontData);
+	ScrollingMsg.Init(&mleds, mleds.Width(), ScrollingMsg.FontHeight() + 1, 0, 0);
 #endif
 
-  // initiale Helligkeit setzen
-  SetBrightness(BRIGHTNESS_DEFAULT);
-  
-  
-  // WLAN-Konfiguration
-  //
-  showWord(W_WLAN, CRGB::Red);
-  WiFi.hostname("WordClock");
-
-  wifiManager.setAPCallback(configModeCallback);
-
-  if (!wifiManager.autoConnect("WordClock")) {
-    Serial.println("WiFiManager; failed to connect and hit timeout");
-    //reset and try again, or maybe put it to deep sleep
-    ESP.reset();
-    delay(1000);
-  }
-
-  showWord(W_WLAN, CRGB::Green);
-  delay(1000);
-
-  ipL = WiFi.localIP();
-  ip = ipL.toString();
-  showIP(ipL.toString());
-  // WLAN passt
+	// initiale Helligkeit setzen
+	setBrightness(BRIGHTNESS_DEFAULT);
 
 
+	// WLAN-Konfiguration
+	//
+	showWord(W_WLAN, CRGB::Red);
+	WiFi.hostname("WordClock");
+
+	wifiManager.setAPCallback(configModeCallback);
+
+	if (!wifiManager.autoConnect("WordClock")) {
+		Serial.println("WiFiManager; failed to connect and hit timeout");
+		//reset and try again, or maybe put it to deep sleep
+		ESP.reset();
+		delay(1000);
+	}
+
+	showWord(W_WLAN, CRGB::Green);
+	delay(1000);
+
+	ipL = WiFi.localIP();
+	ip = ipL.toString();
+	showIP(ipL.toString());
+	// WLAN passt
 
 
+	//
+	//
+	// OTA
+	//
+	//
 #ifdef FEATURE_OTA
-  // Port defaults to 8266
-  // ArduinoOTA.setPort(8266);
-  ArduinoOTA.setPort(8266);
+	// Port defaults to 8266
+	// ArduinoOTA.setPort(8266);
+	ArduinoOTA.setPort(8266);
 
-  // Hostname defaults to esp8266-[ChipID]
-  // ArduinoOTA.setHostname("myesp8266");
-  ArduinoOTA.setHostname("WordClock");
+	// Hostname defaults to esp8266-[ChipID]
+	// ArduinoOTA.setHostname("myesp8266");
+	ArduinoOTA.setHostname("WordClock");
 
-  // No authentication by default
-  // ArduinoOTA.setPassword("admin");
+	// No authentication by default
+	// ArduinoOTA.setPassword("admin");
 
-  // Password can be set with it's md5 value as well
-  // MD5(admin) = 21232f297a57a5a743894a0e4a801fc3
-  // ArduinoOTA.setPasswordHash("21232f297a57a5a743894a0e4a801fc3");
+	// Password can be set with it's md5 value as well
+	// MD5(admin) = 21232f297a57a5a743894a0e4a801fc3
+	// ArduinoOTA.setPasswordHash("21232f297a57a5a743894a0e4a801fc3");
 
-  ArduinoOTA.onStart([]() {
-    String type;
-    if (ArduinoOTA.getCommand() == U_FLASH) {
-      type = "sketch";
-    } else { // U_SPIFFS
-      type = "filesystem";
-    }
+	ArduinoOTA.onStart([]() {
+			String type;
+			if (ArduinoOTA.getCommand() == U_FLASH) {
+			  type = "sketch";
+			} else { // U_SPIFFS
+			  type = "filesystem";
+			}	
 
-    // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
-    Serial.println("OTA start updating " + type);
-  });
-  ArduinoOTA.onEnd([]() {
-    Serial.println("\nEnd");
-  });
-  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    Serial.printf("OTA upload progress: %u%%\r", (progress / (total / 100)));
-  });
-  ArduinoOTA.onError([](ota_error_t error) {
-    Serial.printf("OTA error[%u]: ", error);
-    if (error == OTA_AUTH_ERROR) {
-      Serial.println("Auth Failed");
-    } else if (error == OTA_BEGIN_ERROR) {
-      Serial.println("Begin Failed");
-    } else if (error == OTA_CONNECT_ERROR) {
-      Serial.println("Connect Failed");
-    } else if (error == OTA_RECEIVE_ERROR) {
-      Serial.println("Receive Failed");
-    } else if (error == OTA_END_ERROR) {
-      Serial.println("End Failed");
-    }
-  });
-  ArduinoOTA.begin();             //OTA initialization
-  Serial.println("OTA ready");
+			// NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
+			Serial.println("OTA start updating " + type);
+	});
+	ArduinoOTA.onEnd([]() {
+			Serial.println("\nEnd");
+	});
+	ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+			Serial.printf("OTA upload progress: %u%%\r", (progress / (total / 100)));
+	});
+	ArduinoOTA.onError([](ota_error_t error) {
+			Serial.printf("OTA error[%u]: ", error);
+			if (error == OTA_AUTH_ERROR) {
+				Serial.println("Auth Failed");
+			} else if (error == OTA_BEGIN_ERROR) {
+				Serial.println("Begin Failed");
+			} else if (error == OTA_CONNECT_ERROR) {
+				Serial.println("Connect Failed");
+			} else if (error == OTA_RECEIVE_ERROR) {
+				Serial.println("Receive Failed");
+			} else if (error == OTA_END_ERROR) {
+				Serial.println("End Failed");
+			}
+	});
+	
+	ArduinoOTA.begin();             //OTA initialization
+	Serial.println("OTA ready");
 #endif
 
-  // start webserver
-  startServer();
+	// start webserver
+	startServer();
 
-  // start time-service
-  //timeClient.begin();
-  //timeClient.update();
+	// start time-service
+	//timeClient.begin();
+	//timeClient.update();
 
-  configTime(3600 * CONFIG.timezone, 1 * 3600, "0.pool.ntp.org", "time.nist.gov", "1.pool.ntp.org");
-  
+	configTime(3600 * CONFIG.timezone, 1 * 3600, "0.pool.ntp.org", "time.nist.gov", "1.pool.ntp.org");
+
 	heute_tag = -1;
 	myMode = MODE_TEMP;			// aktueller Anzeigemodus für den Zustandsautomaten
 	mode_change = true;
+
+#ifdef TEMPERATURE
 	temperature = ERR_TEMP;
+#endif
 }
 
 void loop() {
@@ -850,7 +927,7 @@ void loop() {
 		mode_change = true;
 		
 		// Falls gerade die Dunkelschaltung erfolgt...
-		SetBrightness(BRIGHTNESS_AUTO);
+		setBrightness(BRIGHTNESS_AUTO);
 		
 		Serial.println("Neue Minute " + String(minute));
 	}

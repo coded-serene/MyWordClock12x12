@@ -1,7 +1,9 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+//
 // Feature Toggles aktivieren mit define, deaktivieren mit undef
+//
 #define GEBURTSTAGE 1
 #define LAUFSCHRIFT 1
 #define TEMPERATURE 1
@@ -13,14 +15,13 @@
 //#undef LOCALE
 //#undef FEATURE_OTA
 
-// unterdrücken der PRAGMA-Meldungen in FastLED
-#define FASTLED_INTERNAL
+
+#define FASTLED_INTERNAL			// unterdrücken der PRAGMA-Meldungen in FastLED
 #define FASTLED_ALLOW_INTERRUPTS 0	// gegen Glitching
 
-#include <FastLED.h>            // http://fastled.io      https://github.com/FastLED/FastLED
+#include <FastLED.h>            	// http://fastled.io      https://github.com/FastLED/FastLED
 
-// Je nach LED-Stripe kann RGB oder GRB (oder vllt. auch ein total anderer Typ auszuwählen sein
-#define LEDCOLORORDER RGB
+#define LEDCOLORORDER RGB			// Je nach LED-Stripe kann RGB oder GRB (oder vllt. auch ein total anderer Typ auszuwählen sein
 
 #define DATA_PIN 4
 
@@ -87,5 +88,5 @@ typedef struct {
 #define BRIGHTNESS_DEFAULT	75
 #define BRIGHTNESS_MAX		100
 
-#define LAUFSCHRIFT_SPEED 150
+#define LAUFSCHRIFT_SPEED 	150
 #endif

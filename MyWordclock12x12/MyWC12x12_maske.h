@@ -1,6 +1,3 @@
-
-
-
 //
 // Wortindices, sind unabhängig von der Buchstabenmaske, beschreiben die Position im Array der Worte
 //
