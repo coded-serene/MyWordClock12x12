@@ -641,6 +641,10 @@ void showTime(int hour, int minute) {
 
   setHerz();
 
+  if (WiFi.status() != WL_CONNECTED) {
+	setWord(W_WLAN, CRGB::Red);
+  }
+  
   setWord(W_ES_IST, CONFIG.color_fg);
 
   // Minuten
@@ -928,6 +932,12 @@ void loop() {
 		
 		// Falls gerade die Dunkelschaltung erfolgt...
 		setBrightness(BRIGHTNESS_AUTO);
+		
+		if (minute % 5 == 0) {
+			// alle 5 Minuten
+			// Falls das WLAN nicht funktioniert, reconnect versuchen
+			(void)wifiManager.autoConnect("WordClock");
+		}
 		
 		Serial.println("Neue Minute " + String(minute));
 	}
