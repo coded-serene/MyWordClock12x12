@@ -6,6 +6,12 @@
 #include "MyWC12x12_webserver.h"
 #include "MyWC12x12_temperatur.h"
 
+//
+// Webserver für die Konfiguration
+ESP8266WebServer server(80);
+
+// lokale Modulvariable
+String serverName;
 
 //
 // interne Funktionen
@@ -379,12 +385,15 @@ void handleRootPath() {
   content += "</form>";
   content += "</body></html>";
 
-  server.sendHeader("Location", "http://" + ip);
+  server.sendHeader("Location", "http://" + serverName);
   server.send(200, "text/html", content);
 
 }
 
-void startServer() {
+void startServer(String sName) {
+	
+  serverName = sName;
+  
   server.on("/", handleRootPath);
   server.begin();
 }

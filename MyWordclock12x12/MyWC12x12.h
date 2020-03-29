@@ -5,8 +5,6 @@
 #else
 extern CRGB leds[NUM_LEDS];
 extern config_t CONFIG;
-extern String ip;
-
 
 extern void setBrightness(int);
 extern void resetLEDs();

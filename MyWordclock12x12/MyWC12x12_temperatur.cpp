@@ -14,34 +14,10 @@
 //
 // globale Variable
 //
-int temperature = ERR_TEMP;  // temperatur
-String temperature_real_location;	// von wttr.in tatsächlich genutzter Ort, zur Ausgabe auf der Webseite
+int temperature = ERR_TEMP;  			// temperatur
+String temperature_real_location;		// von wttr.in tatsächlich genutzter Ort, zur Ausgabe auf der Webseite
+										// kann auch eine Fehlermeldung enthalten. Diese beginnt immer mit "Fehler"
 
-
-
-//
-void showTemperature(int t, CRGB c) {
-
-	if (t == ERR_TEMP) {
-		resetLEDs();
-
-		setWord(W_GRAD, CRGB::Red);
-
-		FastLED.show();
-	}
-	else {
-		
-		if (t < -39 || t > 39) return;
-
-		resetLEDs();
-
-		setWord(W_ES_IST, c);
-		setNumber(t, c);
-		setWord(W_GRAD, c);
-
-		FastLED.show();
-	}
-}
 
 // Farbabstufung der Temperaturanzeige
 //
@@ -107,7 +83,7 @@ String GetTemperatureRealLocation(String city) {
 		if (httpCode == 200) {
 
 			payload="";
-			location = "Ort war nicht in der Anfrageantwort enthalten.";
+			location = "Fehler: Ort war nicht in der Anfrageantwort enthalten.";
 			
 			// get lenght of document (is -1 when Server sends no Content-Length header)
 			int len = http.getSize();
@@ -162,8 +138,8 @@ String GetTemperatureRealLocation(String city) {
 				}
 			}
 		} else {
-			Serial.println("ERROR getting TEMPERATURE Location: httpCode=" +  String(httpCode));
-			location = String("Fehler bei der Ortsbestimmung: Anfragefehler " + String(httpCode));
+			Serial.println("Fehler bei der Ortsbestimmung: Anfragefehler httpCode=" +  String(httpCode));
+			location = String("Fehler bei der Ortsbestimmung: Anfragefehler httpCode=" + String(httpCode));
 		}
 
 		http.end();
@@ -179,11 +155,18 @@ String GetTemperatureRealLocation(String city) {
 //
 int GetTemperature(String city) {
 	int httpCode;	
-	int temperature = ERR_TEMP; // is a kind of error code!
+	int t = ERR_TEMP; // is a kind of error code!
 	HTTPClient http;            //Declare object of class HTTPClient
 	String weatherstring;
 	String payload;
 	String temp_temperature;
+
+
+	// Den Ort holen, den wttr.in dem Wert "city" tatsächlich zuordnet. Es gibt mehrere "Neustadt"!!!
+	//
+	if (temperature_real_location == "" || temperature_real_location.startsWith("Fehler")) {
+		temperature_real_location = GetTemperatureRealLocation(city);
+	}
 
 	if (WiFi.status() == WL_CONNECTED) {                    						//Check WiFi connection status
 		weatherstring = "http://wttr.in/" + city + "?format=\%t";    //Specify request destination
@@ -191,6 +174,7 @@ int GetTemperature(String city) {
 		Serial.println(weatherstring);
 
 		http.begin(weatherstring);
+
 		httpCode = http.GET();
 
 		if (httpCode >= HTTP_CODE_OK) {
@@ -199,30 +183,69 @@ int GetTemperature(String city) {
 			temp_temperature = payload.substring(0, payload.length() - 4); 	//Format is "+x°C\n" wobei ° zwei Bytes einnimmt!
 
 			if ((temp_temperature.charAt(0) == '-') || (temp_temperature.charAt(0) == '+')) { 
-				temperature = temp_temperature.toInt();
+				t = temp_temperature.toInt();
 			}
-
-			http.end();
 		} else {
-			Serial.print  ("ERROR getting TEMPERATURE: httpCode=");   Serial.println(httpCode);
-			temperature_real_location = String("Fehler bei der Temperaturabfrage: Anfragefehler " + httpCode);
-
-			http.end();                                           						//Close connection
+			Serial.print  ("Fehler bei der Temperaturabfrage: Anfragefehler httpCode=");   Serial.println(httpCode);
+			temperature_real_location = String("Fehler bei der Temperaturabfrage: Anfragefehler httpCode=" + httpCode);
 		}
+
+		http.end();                                           						//Close connection
 
 	}
 
-	Serial.println(temperature);
+	Serial.println(t);
 
-	temperature_real_location = GetTemperatureRealLocation(city);
-
-	return temperature;
+	return t;
 }
 
+
+//
+void showTemperature() {
+
+	CRGB c;
+	
+	if (temperature == ERR_TEMP) {
+		resetLEDs();
+
+		setWord(W_GRAD, CRGB::Red);
+
+		FastLED.show();
+	}
+	else {
+		
+		if (temperature < -39 || temperature > 39) return;
+
+		resetLEDs();
+
+		c = GetTemperatureColor(temperature);
+		
+		setWord(W_ES_IST, c);
+		setNumber(temperature, c);
+		setWord(W_GRAD, c);
+
+		FastLED.show();
+	}
+}
+
+
 void testTemperatur() {
-	for (int i=-39; i<40; i++) {
-		showTemperature(i, GetTemperatureColor(i));
+	int i;
+	CRGB c;
+	
+	for (i=-39; i<40; i++) {
+		resetLEDs();
+
+		c = GetTemperatureColor(i);
+		
+		setWord(W_ES_IST, c);
+		setNumber(i, c);
+		setWord(W_GRAD, c);
+
+		FastLED.show();
+		
 		delay(500);
 	}
 }
+
 #endif
