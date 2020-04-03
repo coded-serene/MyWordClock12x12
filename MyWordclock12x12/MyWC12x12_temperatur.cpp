@@ -14,61 +14,88 @@
 //
 // globale Variable
 //
-int temperature = ERR_TEMP;  // temperatur
-String temperature_real_location;	// von wttr.in tatsächlich genutzter Ort, zur Ausgabe auf der Webseite
+int mywc_g_temperature = ERR_TEMP;  // temperatur
+String mywc_g_temperature_real_location;	// von wttr.in tatsächlich genutzter Ort, zur Ausgabe auf der Webseite
 
 
+// Modulvariable
+int l_last_valid_temperature = ERR_TEMP;					// Wert der letzten erfolgreichen Temperaturabfrage
+unsigned int l_last_valid_temperature_millis;	// Zeitwert der letzten erfolgreichen Temperaturabfrage
 
 //
 void showTemperature(int t, CRGB c) {
 
+	unsigned int jetzt;
+	
+	
+	resetLEDs();
+
 	if (t == ERR_TEMP) {
-		resetLEDs();
+		// die Temperatur konnte nicht ermittelt werden
 
-		setWord(W_GRAD, CRGB::Red);
-
-		FastLED.show();
-	}
-	else {
+		jetzt = millis();
 		
-		if (t < -39 || t > 39) return;
+		if	(	l_last_valid_temperature == ERR_TEMP 
+			|| (jetzt - l_last_valid_temperature_millis > ERR_TEMP_TOLERANCE_MINUTES*60*1000) 
+			|| (jetzt < l_last_valid_temperature_millis)
+			) {
+			// und es ist keine gueltige vorherige Temperatur bekannt
+			// oder die ist aelter als ERR_TEMP_TOLERANCE_MINUTES Minuten
+			setWord(W_GRAD, CRGB::Red);
+		}
+		else {
+			setWord(W_VIER_PUNKTE, CRGB::Red);
+			t = l_last_valid_temperature;
+		}
+	}
 
-		resetLEDs();
+	if (t != ERR_TEMP) {
+		// es ist eine gültige Temperatur ermittelt worden, oder die temperatur ist auf die letzte Gültige gesetzt worden
+		if (t < -39 ) {
+			// die aber nicht angezeigt werden kann (zu klein)
+			t=-39;
+			setWord(W_VIER_PUNKTE, CRGB::Yellow);
+		}
+		if (t > 39) {
+			// die aber nicht angezeigt werden kann (zu groß)
+			t=-39;
+			setWord(W_VIER_PUNKTE, CRGB::Yellow);
+		}
 
 		setWord(W_ES_IST, c);
 		setNumber(t, c);
 		setWord(W_GRAD, c);
-
-		FastLED.show();
 	}
+	
+	FastLED.show();
 }
 
 // Farbabstufung der Temperaturanzeige
 //
 CRGB GetTemperatureColor(int t) {
 	// -39 bis -5	blau
-	// -4  bis 0	hellblau
-	// 1   bis 5    gruen
-	// 6   bis 15   hellgruen
-	// 16  bis 20   gelb
-	// 21  bis 27   orange
-	// 28  bis 39   rot
+	// -4  bis 5	hellblau
+	// 6   bis 15   gruen
+	// 16  bis 20   hellgruen
+	// 21  bis 25   gelb
+	// 26  bis 30   orange
+	// 31  bis 39   rot
 	if (t<=-5) {
 		return CRGB::Blue;
 	}
-	else if (t<=0) {
+	else if (t<=5) {
 		return CRGB::LightSkyBlue;
 	}
-	else if (t<=5) {
+	else if (t<=15) {
 		return CRGB::SeaGreen;
 	}
-	else if (t<=15) {
+	else if (t<=20) {
 		return CRGB::Green;
 	}
-	else if (t<=20) {
+	else if (t<=25) {
 		return CRGB::Yellow;
 	}
-	else if (t<=27) {
+	else if (t<=30) {
 		return CRGB::Orange;
 	}
 	else {
@@ -179,11 +206,13 @@ String GetTemperatureRealLocation(String city) {
 //
 int GetTemperature(String city) {
 	int httpCode;	
-	int temperature = ERR_TEMP; // is a kind of error code!
+	int temperature;
 	HTTPClient http;            //Declare object of class HTTPClient
 	String weatherstring;
 	String payload;
 	String temp_temperature;
+
+	temperature = ERR_TEMP; // is a kind of error code!
 
 	if (WiFi.status() == WL_CONNECTED) {                    						//Check WiFi connection status
 		weatherstring = "http://wttr.in/" + city + "?format=\%t";    //Specify request destination
@@ -205,16 +234,22 @@ int GetTemperature(String city) {
 			http.end();
 		} else {
 			Serial.print  ("ERROR getting TEMPERATURE: httpCode=");   Serial.println(httpCode);
-			temperature_real_location = String("Fehler bei der Temperaturabfrage: Anfragefehler " + httpCode);
+			mywc_g_temperature_real_location = String("Fehler bei der Temperaturabfrage: Anfragefehler " + httpCode);
 
 			http.end();                                           						//Close connection
 		}
 
 	}
 
+	if (temperature != ERR_TEMP) {
+		// es gibt eine gültige Temperatur
+		l_last_valid_temperature = temperature;
+		l_last_valid_temperature_millis = millis();
+	}
+	
 	Serial.println(temperature);
 
-	temperature_real_location = GetTemperatureRealLocation(city);
+	mywc_g_temperature_real_location = GetTemperatureRealLocation(city);
 
 	return temperature;
 }

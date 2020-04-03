@@ -179,7 +179,7 @@ String getTimeForm() {
   content += "<div>";
   content += "<label>Ort</label>";
   content += "<input name=\"city\" value=\"" + String(CONFIG.city) + "\">";
-  content += "<p style=\"font-size:0.75em;\">" + temperature_real_location + "</p>";
+  content += "<p style=\"font-size:0.75em;\">" + mywc_g_temperature_real_location + "</p>";
   content += "</div>";
 #endif
 
@@ -320,11 +320,11 @@ void handleRootPath() {
 
   content += "<!DOCTYPE html><html>";
   content += "<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">";
-  content += "<style>";
-  content += "* { box-sizing: border-box; }";
-  content += "html, body { font-family: Helvetica; margin: 0; padding: 0; }";
-  content += ".form { margin: auto; max-width: 400px; }";
-  content += ".form div { margin: 0; padding: 20px 0; width: 100%; font-size: 1.4rem; }";
+  content += "<style>\n";
+  content += "* { box-sizing: border-box; }\n";
+  content += "html, body { font-family: Helvetica; margin: 0; padding: 0; }\n";
+  content += ".form { margin: auto; max-width: 400px; }\n";
+  content += ".form div { margin-top: 10; width: 100%; }\n";
   content += "label { width: 60%; display: inline-block; margin: 0; vertical-align: middle; }";
   content += "input, select { width: 38%; display: inline-block; margin: 0; border: 1px solid #eee; padding: 0; height: 40px; vertical-align: right; }";
   content += "select.time { width: 18%; }";

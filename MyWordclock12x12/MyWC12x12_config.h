@@ -89,4 +89,5 @@ typedef struct {
 #define BRIGHTNESS_MAX		100
 
 #define LAUFSCHRIFT_SPEED 	150
+
 #endif

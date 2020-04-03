@@ -402,10 +402,7 @@ void GetDatum(int *tag, int *monat, int *jahr) {
   struct tm tmstruct;
 
   // Datum herausfinden
-  //configTime(3600 * CONFIG.timezone, 1 * 3600, "0.pool.ntp.org", "time.nist.gov", "1.pool.ntp.org");
-
-  //delay(2000);
-  //tmstruct.tm_year = 0;
+  tmstruct.tm_year = 0;
   getLocalTime(&tmstruct, 5000);
   //Serial.printf("\nNow is : %d-%02d-%02d %02d:%02d:%02d\n", (tmstruct.tm_year) + 1900, (tmstruct.tm_mon) + 1, tmstruct.tm_mday, tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
   //
@@ -522,7 +519,6 @@ void setNumber(int n, CRGB c = CRGB::White) {
       setWord(W_DREISSIG, c);
     }
   }
-
 }
 
 
@@ -741,7 +737,7 @@ void restart() {
 
 #ifdef TEMPERATURE	
 	// evtl. wurde der Ort geaendert, also sicherheitshalber die Temperatur neu holen
-	temperature = GetTemperature(CONFIG.city);
+	mywc_g_temperature = GetTemperature(CONFIG.city);
 #endif
 	
 	// vllt. ist die Regionaleinstellung geändert...
@@ -755,21 +751,22 @@ void restart() {
 // Initialisierung
 //
 void setup() {
-  IPAddress ipL;
-    Serial.begin(74880);
-
+	IPAddress ipL;
+    
+	
+	Serial.begin(74880);
 
 #ifdef GEBURTSTAGE
-  Serial.println("Feature Geburtstage enabled!");
+	Serial.println("Feature Geburtstage enabled!");
 #endif
 #ifdef LAUFSCHRIFT
-  Serial.println("Feature Laufschrift enabled!");
+	Serial.println("Feature Laufschrift enabled!");
 #endif
 #ifdef TEMPERATURE
-  Serial.println("Feature Temperaturanzeige enabled!");
+	Serial.println("Feature Temperaturanzeige enabled!");
 #endif
 #ifdef FEATURE_OTA
-  Serial.println("Feature OTA enabled!");
+	Serial.println("Feature OTA enabled!");
 #endif
 
 
@@ -792,7 +789,6 @@ void setup() {
 	// initiale Helligkeit setzen
 	setBrightness(BRIGHTNESS_DEFAULT);
 
-
 	// WLAN-Konfiguration
 	//
 	showWord(W_WLAN, CRGB::Red);
@@ -813,13 +809,11 @@ void setup() {
 	ipL = WiFi.localIP();
 	ip = ipL.toString();
 	showIP(ipL.toString());
-	// WLAN passt
+	//
+	// WLAN-Konfiguration passt
 
 
-	//
-	//
 	// OTA
-	//
 	//
 #ifdef FEATURE_OTA
 	// Port defaults to 8266
@@ -876,10 +870,7 @@ void setup() {
 	// start webserver
 	startServer();
 
-	// start time-service
-	//timeClient.begin();
-	//timeClient.update();
-
+	// Configure time-service, mit Sommer/Winterzeit von einer Stunde
 	configTime(3600 * CONFIG.timezone, 1 * 3600, "0.pool.ntp.org", "time.nist.gov", "1.pool.ntp.org");
 
 	heute_tag = -1;
@@ -887,7 +878,7 @@ void setup() {
 	mode_change = true;
 
 #ifdef TEMPERATURE
-	temperature = ERR_TEMP;
+	mywc_g_temperature = ERR_TEMP;
 #endif
 }
 
@@ -921,14 +912,14 @@ void loop() {
 	// Diese Aktionen sollten nur noch einmal pro Minute laufen
 	//
 	if (h != hour || m != minute) {
-		// neue Minute
 
-		hour = h;
-		minute = m;
+		// neue Minute
+		hour 		= h;
+		minute 		= m;
 
 		// wir starten mit der Temperatur....
-		myMode = MODE_TEMP;
-		mode_change = true;
+		myMode 		= MODE_TEMP;
+		mode_change	= true;
 		
 		// Falls gerade die Dunkelschaltung erfolgt...
 		setBrightness(BRIGHTNESS_AUTO);
@@ -942,20 +933,20 @@ void loop() {
 		Serial.println("Neue Minute " + String(minute));
 	}
 	
-	// Serial.println("Loop 2 - MODE " + String(myMode) + " mode_change=" + String(mode_change));
-	
 #ifdef TEMPERATURE
 	//
 	// Temperatur alle 15 Minuten aktualisieren, oder falls keine Temperatur ermittelt werden konnte
 	//
-	if (CONFIG.temp_active != TEMPERATURE_AUS  && (minute == 0 || minute == 15 || minute == 30 || minute == 45 || temperature == ERR_TEMP) && temperatur_minute != minute) {
+	// im Idealfall wird die Temperatur nur alle 15 Minuten ermittelt
+	//
+	if	(	CONFIG.temp_active != TEMPERATURE_AUS 		// wenn überhaupt das Temperatur-Feature aktiviert ist
+		&& 	temperatur_minute != minute  				// und zu dieser Minute noch keine Temperaturermittling stattgefunden hat
+		&& 	(minute == 0 || minute == 15 || minute == 30 || minute == 45 || mywc_g_temperature == ERR_TEMP) 	// und entweder die Temperatur ermittelt werden soll (alle Viertelstunde) oder muss (keine aktuelle Temperatur)
+		) {
 		temperatur_minute = minute;
-		temperature = GetTemperature(CONFIG.city);
+		mywc_g_temperature = GetTemperature(CONFIG.city);
 	}
 #endif  
-  
-	//Serial.println("Loop 3 - MODE " + String(myMode) + " mode_change=" + String(mode_change));
-
 	
 	if (mode_change == true) {
 		
@@ -968,13 +959,12 @@ void loop() {
 		case MODE_TIME:
 
 			showTime(hour,	minute);
-		break;
+			break;
 		
 #ifdef GEBURTSTAGE
 		case MODE_BIRTHDAY:
 #ifdef LAUFSCHRIFT
 			if (isGeburtstagheut(heute_tag, heute_monat) && ((m % 5) == 0)) {
-				
 				
 				Serial.println("Starte Geburtstag");
 				
@@ -1008,10 +998,10 @@ void loop() {
 				|| (CONFIG.temp_active == TEMPERATURE_5MINUTE && ((minute%5)==0))
 				) {
 				// temperaturanzeige starten
-				temperatur_minute = minute;
-				temperatur_millis = millis();
+				temperatur_minute = minute;			// zu dieser Minute die Temperaturanzeige nicht mehr starten
+				temperatur_millis = millis();		// zur Realisierung einer Anzeigedauer diese Startzeit der Anzeige merken
 
-				showTemperature(temperature, GetTemperatureColor(temperature));
+				showTemperature(mywc_g_temperature, GetTemperatureColor(mywc_g_temperature));
 				// Temperaturanzeige wird in mode_temperatur beendet
 			} 
 			else {
@@ -1079,7 +1069,6 @@ void loop() {
 #ifdef GEBURTSTAGE
 		case MODE_BIRTHDAY:
 		
-		
 			if (!geburtstag_ende) {
 				jetzt = millis();
 				
@@ -1097,7 +1086,6 @@ void loop() {
 				myMode = MODE_TIME;
 				Serial.println("MODE_TIME");
 				mode_change = true;
-				//hour = -1;
 			}
 			break;
 #endif
@@ -1128,6 +1116,4 @@ void loop() {
 	// Webserver bedienen
 	//
 	handleClientServer(); 
-	
-	//Serial.println("Ende Loop - MODE " + String(myMode) + " mode_change=" + String(mode_change));
 }
