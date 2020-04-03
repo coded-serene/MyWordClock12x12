@@ -21,7 +21,7 @@
 
 #include <FastLED.h>            	// http://fastled.io      https://github.com/FastLED/FastLED
 
-#define LEDCOLORORDER GRB			// Je nach LED-Stripe kann RGB oder GRB (oder vllt. auch ein total anderer Typ auszuwählen sein
+#define LEDCOLORORDER RGB			// Je nach LED-Stripe kann RGB oder GRB (oder vllt. auch ein total anderer Typ auszuwählen sein
 
 #define DATA_PIN 4
 
@@ -35,10 +35,6 @@
 
 #define CONFIGFILE "/wordclock_config.json"
 #define MODE_TIME 0
-
-#define NTP_SERVER1 "0.de.pool.ntp.org"
-#define NTP_SERVER2 "0.pool.ntp.org"
-#define NTP_SERVER3 "1.pool.ntp.org"
 
 typedef struct {
   CRGB color_bg;
@@ -93,4 +89,5 @@ typedef struct {
 #define BRIGHTNESS_MAX		100
 
 #define LAUFSCHRIFT_SPEED 	150
+
 #endif

@@ -5,7 +5,9 @@
 
 #define MODE_TEMP 				1
 
-#define ERR_TEMP  				1000 		 // Fehlerwert, wenn die Temperatur nicht ermittelt werden kann
+#define ERR_TEMP  				1000 	// Fehlerwert, wenn die Temperatur nicht ermittelt werden kann
+
+#define ERR_TEMP_TOLERANCE_MINUTES 15	// erst nach 15 Minuten ohne aktuelle Temperatur einen Fehler (rotes Wort GRAD) anzeigen
 
 #define TEMPERATURE_AUS 		0
 #define TEMPERATURE_MINUTE 		1
@@ -15,14 +17,16 @@
 #ifdef TEMPERATUR_CPP
 
 #else
-extern String temperature_real_location;
-extern int temperature;
+extern int mywc_g_temperature;
+extern String mywc_g_temperature_real_location;
 
 extern void testTemperatur();
 
+extern CRGB GetTemperatureColor(int t);
+
 extern String GetTemperatureRealLocation(String s);
 extern int GetTemperature(String s);
-extern void showTemperature();
+extern void showTemperature(int t, CRGB c);
 
 #endif
 
