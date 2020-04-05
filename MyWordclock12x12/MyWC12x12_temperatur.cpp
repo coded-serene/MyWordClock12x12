@@ -131,7 +131,7 @@ String GetTemperatureRealLocation(String city) {
 		http.begin(client, weatherstring);
 		httpCode = http.GET();
 
-		if (httpCode == 200) {
+		if (httpCode == HTTP_CODE_OK) {
 
 			payload="";
 			location = "Ort war nicht in der Anfrageantwort enthalten.";
@@ -211,9 +211,11 @@ int GetTemperature(String city) {
 	String weatherstring;
 	String payload;
 	String temp_temperature;
+	String errorstring;
 
 	temperature = ERR_TEMP; // is a kind of error code!
-
+	errorstring = NULL;		// kein Fehlertext
+	
 	if (WiFi.status() == WL_CONNECTED) {                    						//Check WiFi connection status
 		weatherstring = "http://wttr.in/" + city + "?format=\%t";    //Specify request destination
 
@@ -222,7 +224,7 @@ int GetTemperature(String city) {
 		http.begin(weatherstring);
 		httpCode = http.GET();
 
-		if (httpCode >= HTTP_CODE_OK) {
+		if (httpCode == HTTP_CODE_OK) {
 			payload = http.getString();                  						//Get the response payload
 
 			temp_temperature = payload.substring(0, payload.length() - 4); 	//Format is "+x°C\n" wobei ° zwei Bytes einnimmt!
@@ -230,17 +232,18 @@ int GetTemperature(String city) {
 			if ((temp_temperature.charAt(0) == '-') || (temp_temperature.charAt(0) == '+')) { 
 				temperature = temp_temperature.toInt();
 			}
-
-			http.end();
-		} else {
+		} 
+		else {
 			Serial.print  ("ERROR getting TEMPERATURE: httpCode=");   Serial.println(httpCode);
-			mywc_g_temperature_real_location = String("Fehler bei der Temperaturabfrage: Anfragefehler " + httpCode);
+			errorstring = String("Fehler bei der Temperaturabfrage: Anfragefehler " + httpCode);
 
-			http.end();                                           						//Close connection
 		}
-
+		http.end();                                           						//Close connection
 	}
-
+	else {
+		errorstring = "Keine WLAN-Verbindung";
+	}
+	
 	if (temperature != ERR_TEMP) {
 		// es gibt eine gültige Temperatur
 		l_last_valid_temperature = temperature;
@@ -250,6 +253,10 @@ int GetTemperature(String city) {
 	Serial.println(temperature);
 
 	mywc_g_temperature_real_location = GetTemperatureRealLocation(city);
+	
+	if (errorstring != NULL) {
+		mywc_g_temperature_real_location =+ "\n" + errorstring;
+	}
 
 	return temperature;
 }
