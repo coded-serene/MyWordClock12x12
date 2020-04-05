@@ -131,14 +131,15 @@ String GetTemperatureRealLocation(String city) {
 		http.begin(client, weatherstring);
 		httpCode = http.GET();
 
-		if (httpCode == HTTP_CODE_OK) {
+		if (httpCode >= HTTP_CODE_OK) {
 
 			payload="";
-			location = "Ort war nicht in der Anfrageantwort enthalten.";
 			
 			// get lenght of document (is -1 when Server sends no Content-Length header)
 			int len = http.getSize();
 
+			location = "Ort war nicht in der Anfrageantwort enthalten. Antwortl&auml;nge=" + String(len);
+			
 			// create buffer for read
 			char buff[129] = { 0 };
 			buff[128] = (char)0;
@@ -214,7 +215,7 @@ int GetTemperature(String city) {
 	String errorstring;
 
 	temperature = ERR_TEMP; // is a kind of error code!
-	errorstring = NULL;		// kein Fehlertext
+	errorstring = "";		// kein Fehlertext
 	
 	if (WiFi.status() == WL_CONNECTED) {                    						//Check WiFi connection status
 		weatherstring = "http://wttr.in/" + city + "?format=\%t";    //Specify request destination
@@ -224,7 +225,7 @@ int GetTemperature(String city) {
 		http.begin(weatherstring);
 		httpCode = http.GET();
 
-		if (httpCode == HTTP_CODE_OK) {
+		if (httpCode >= HTTP_CODE_OK) {
 			payload = http.getString();                  						//Get the response payload
 
 			temp_temperature = payload.substring(0, payload.length() - 4); 	//Format is "+x°C\n" wobei ° zwei Bytes einnimmt!
@@ -235,27 +236,28 @@ int GetTemperature(String city) {
 		} 
 		else {
 			Serial.print  ("ERROR getting TEMPERATURE: httpCode=");   Serial.println(httpCode);
-			errorstring = String("Fehler bei der Temperaturabfrage: Anfragefehler " + httpCode);
+			errorstring = String("Fehler bei der Temperaturabfrage: Anfragefehler " + String(httpCode));
 
 		}
 		http.end();                                           						//Close connection
 	}
 	else {
-		errorstring = "Keine WLAN-Verbindung";
+		errorstring = String("Keine WLAN-Verbindung");
 	}
 	
 	if (temperature != ERR_TEMP) {
 		// es gibt eine gültige Temperatur
 		l_last_valid_temperature = temperature;
 		l_last_valid_temperature_millis = millis();
+		errorstring = errorstring + "\n" + String(temperature) + String("&deg;C");
 	}
 	
 	Serial.println(temperature);
 
 	mywc_g_temperature_real_location = GetTemperatureRealLocation(city);
 	
-	if (errorstring != NULL) {
-		mywc_g_temperature_real_location =+ "\n" + errorstring;
+	if (errorstring != "") {
+		mywc_g_temperature_real_location = mywc_g_temperature_real_location+ String("\n") + errorstring;
 	}
 
 	return temperature;
