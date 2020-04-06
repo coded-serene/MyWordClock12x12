@@ -80,7 +80,10 @@ CRGB GetTemperatureColor(int t) {
 	// 21  bis 25   gelb
 	// 26  bis 30   orange
 	// 31  bis 39   rot
-	if (t<=-5) {
+	if (t<= -40) {
+		return CRGB::White;
+	}
+	else if (t<=-5) {
 		return CRGB::Blue;
 	}
 	else if (t<=5) {
@@ -98,10 +101,12 @@ CRGB GetTemperatureColor(int t) {
 	else if (t<=30) {
 		return CRGB::Orange;
 	}
-	else {
+	else if (t<=39) {
 		return CRGB::Red;
 	}
-	return CRGB::Red;
+	else {
+		return CRGB::White;
+	}
 }
 
 
@@ -191,7 +196,7 @@ String GetTemperatureRealLocation(String city) {
 			}
 		} else {
 			Serial.println("ERROR getting TEMPERATURE Location: httpCode=" +  String(httpCode));
-			location = String("Fehler bei der Ortsbestimmung: Anfragefehler " + String(httpCode));
+			location = GetDatumZeitString() + String(" Fehler bei der Ortsbestimmung: Anfragefehler " + String(httpCode));
 		}
 
 		http.end();
@@ -236,20 +241,20 @@ int GetTemperature(String city) {
 		} 
 		else {
 			Serial.print  ("ERROR getting TEMPERATURE: httpCode=");   Serial.println(httpCode);
-			errorstring = String("Fehler bei der Temperaturabfrage: Anfragefehler " + String(httpCode));
+			errorstring = GetDatumZeitString() + String(" Fehler bei der Temperaturabfrage: Anfragefehler " + String(httpCode));
 
 		}
 		http.end();                                           						//Close connection
 	}
 	else {
-		errorstring = String("Keine WLAN-Verbindung");
+		errorstring = GetDatumZeitString() + String(" Keine WLAN-Verbindung");
 	}
 	
 	if (temperature != ERR_TEMP) {
 		// es gibt eine gültige Temperatur
 		l_last_valid_temperature = temperature;
 		l_last_valid_temperature_millis = millis();
-		errorstring = errorstring + "\n" + String(temperature) + String("&deg;C");
+		errorstring = errorstring + "<br>\n" + GetDatumZeitString() + String(" ") + String(temperature) + String("&deg;C");
 	}
 	
 	Serial.println(temperature);

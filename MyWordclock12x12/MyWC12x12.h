@@ -21,6 +21,8 @@ extern void saveConfig();
 extern void changeLocale();
 extern void showTime(int, int);
 
+extern String GetDatumZeitString();
+
 #ifdef TEMPERATURE
 extern void startLaufschrift(String, CRGB);
 extern int stepLaufschrift();

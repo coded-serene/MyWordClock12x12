@@ -399,19 +399,27 @@ void GetZeit(int *stunden, int *minuten) {
 
 void GetDatum(int *tag, int *monat, int *jahr) {
 
-  struct tm tmstruct;
+	struct tm tmstruct;
 
-  // Datum herausfinden
-  tmstruct.tm_year = 0;
-  getLocalTime(&tmstruct, 5000);
-  //Serial.printf("\nNow is : %d-%02d-%02d %02d:%02d:%02d\n", (tmstruct.tm_year) + 1900, (tmstruct.tm_mon) + 1, tmstruct.tm_mday, tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
-  //
+	// Datum herausfinden
+	tmstruct.tm_year = 0;
+	getLocalTime(&tmstruct, 5000);
+	//Serial.printf("\nNow is : %d-%02d-%02d %02d:%02d:%02d\n", (tmstruct.tm_year) + 1900, (tmstruct.tm_mon) + 1, tmstruct.tm_mday, tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
 
-  *tag = tmstruct.tm_mday;
-  *monat = (tmstruct.tm_mon) + 1;
-  *jahr = (tmstruct.tm_year) + 1900;
+	*tag = tmstruct.tm_mday;
+	*monat = (tmstruct.tm_mon) + 1;
+	*jahr = (tmstruct.tm_year) + 1900;
 }
 
+String GetDatumZeitString() {
+	char buffer[32];
+	struct tm tmstruct;
+
+	getLocalTime(&tmstruct, 5000);
+	(void)strftime(buffer, 32, "%d.%B %Y %H:%M", &tmstruct);
+	
+	return String(buffer);
+}
 
 // Funktionen zum Arbeiten mit dem LED-Streifen
 //
@@ -469,56 +477,63 @@ void setWord(int word, CRGB col = CRGB::White) {
 
 
 //
-// Eine Zahl anzeigen
-// Temperaturwert von -39 bis +39 möglich
+// Eine Zahl mit Vorzeichen anzeigen, Wert von -39 bis +39 möglich
 //
 void setNumber(int n, CRGB c = CRGB::White) {
-  int einer;
+	int einer;
 
-  if (n < -39 || n > 39) return;
+	// ungültige Werte
+	if (n < -39 || n > 39) return;
 
-  if (n > 0) setWord(W_PLUS, c);
-  if (n < 0) {
-    setWord(W_MINUS, c);
-    n = -n;
-  }
+	// Vorzeichen Plus oder Minus, keines bei 0 Grad
+	if (n > 0) setWord(W_PLUS, c);
+	if (n < 0) {
+		setWord(W_MINUS, c);
+		n = -n;
+	}
 
-  if (n == 0) {
-    setWord(W_NULL, c);
-  }
-  else if (n == 11) {
-    setWord(W_ELF, c);
-  }
-  else if (n == 12) {
-    setWord(W_ZWOELF, c);
-  }
-  else if (n == 16) {
-    setWord(W_SECH, c);
-    setWord(W_ZEHNER, c);
-  }
-  else if (n == 17) {
-    setWord(W_SIEB, c);
-    setWord(W_ZEHNER, c);
-  }
-  else {
-    einer = n % 10;
+	if (n == 0) {
+		setWord(W_NULL, c);
+	}
+	else if (n == 11) {
+		setWord(W_ELF, c);
+	}
+	else if (n == 12) {
+		setWord(W_ZWOELF, c);
+	}
+	else if (n == 16) {
+		setWord(W_SECH, c);
+		setWord(W_ZEHNER, c);
+	}
+	else if (n == 17) {
+		setWord(W_SIEB, c);
+		setWord(W_ZEHNER, c);
+	}
+	else {
+		einer = n % 10;
 
-    if (einer > 0) {
-      setWord(wordsindex_ziffern[einer], c);
-    }
+		if (einer > 0) {
+		  setWord(wordsindex_ziffern[einer], c);
+		}
 
-    if (n > 9 && n < 20) {
-      setWord(W_ZEHNER, c);
-    }
-    else if (n > 19 && n < 30) {
-      setWord(W_UND, c);
-      setWord(W_ZWANZIG, c);
-    }
-    else if (n > 29) {
-      setWord(W_UND, c);
-      setWord(W_DREISSIG, c);
-    }
-  }
+		if (n > 9 && n < 20) {
+		  setWord(W_ZEHNER, c);
+		}
+		else if (n == 20) {
+		  setWord(W_ZWANZIG, c);
+		}
+		else if (n > 20 && n < 30) {
+		  setWord(W_UND, c);
+		  setWord(W_ZWANZIG, c);
+		}
+		else if (n == 30) {
+		  setWord(W_DREISSIG, c);
+		}
+		else if (n > 30) {
+		  setWord(W_UND, c);
+		  setWord(W_DREISSIG, c);
+		}
+	}
 }
 
 
