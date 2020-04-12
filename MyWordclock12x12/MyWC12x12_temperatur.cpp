@@ -26,7 +26,8 @@ unsigned int l_last_valid_temperature_millis;	// Zeitwert der letzten erfolgreic
 void showTemperature(int t, CRGB c) {
 
 	unsigned int jetzt;
-	
+	unsigned int dauer;		// Zeitspanne in millis, seitdem keine Zeit mehr ermittelt wurde
+	unsigned int anz_leds;
 	
 	resetLEDs();
 
@@ -34,17 +35,29 @@ void showTemperature(int t, CRGB c) {
 		// die Temperatur konnte nicht ermittelt werden
 
 		jetzt = millis();
+		if (jetzt >= l_last_valid_temperature_millis) {
+			dauer = jetzt - l_last_valid_temperature_millis;
+		}
+		else {
+			dauer = jetzt;	// OK, ich weiß die Dauer ist in Wirklichkeit länger
+		}
 		
-		if	(	l_last_valid_temperature == ERR_TEMP 
-			|| (jetzt - l_last_valid_temperature_millis > ERR_TEMP_TOLERANCE_MINUTES*60*1000) 
-			|| (jetzt < l_last_valid_temperature_millis)
-			) {
+		anz_leds = dauer / 1000 / 60;	// pro Minute eine LED
+		
+		if (anz_leds <= 0) {
+			anz_leds = 1;
+		}
+		else if (anz_leds>4) {
+			anz_leds = 4;
+		}
+		
+		if	(  (l_last_valid_temperature == ERR_TEMP) || (dauer > ERR_TEMP_TOLERANCE_MINUTES*60*1000)) {
 			// und es ist keine gueltige vorherige Temperatur bekannt
 			// oder die ist aelter als ERR_TEMP_TOLERANCE_MINUTES Minuten
 			setWord(W_GRAD, CRGB::Red);
 		}
 		else {
-			setWord(W_VIER_PUNKTE, CRGB::Red);
+			setWord(wordsindex_single_m[anz_leds], CRGB::Red);
 			t = l_last_valid_temperature;
 		}
 	}
@@ -58,7 +71,7 @@ void showTemperature(int t, CRGB c) {
 		}
 		if (t > 39) {
 			// die aber nicht angezeigt werden kann (zu groß)
-			t=-39;
+			t= 39;
 			setWord(W_VIER_PUNKTE, CRGB::Yellow);
 		}
 
@@ -262,7 +275,7 @@ int GetTemperature(String city) {
 	mywc_g_temperature_real_location = GetTemperatureRealLocation(city);
 	
 	if (errorstring != "") {
-		mywc_g_temperature_real_location = mywc_g_temperature_real_location+ String("\n") + errorstring;
+		mywc_g_temperature_real_location = mywc_g_temperature_real_location+ String("<br>") + errorstring;
 	}
 
 	return temperature;
