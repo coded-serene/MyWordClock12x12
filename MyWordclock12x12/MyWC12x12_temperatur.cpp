@@ -14,13 +14,28 @@
 //
 // globale Variable
 //
-int mywc_g_temperature = ERR_TEMP;  // temperatur
-String mywc_g_temperature_real_location;	// von wttr.in tatsächlich genutzter Ort, zur Ausgabe auf der Webseite
+int mywc_g_temperature 				= ERR_TEMP;	// temperatur
+String mywc_g_temperature_real_location;		// von wttr.in tatsächlich genutzter Ort, zur Ausgabe auf der Webseite
 
 
 // Modulvariable
-int l_last_valid_temperature = ERR_TEMP;					// Wert der letzten erfolgreichen Temperaturabfrage
-unsigned int l_last_valid_temperature_millis;	// Zeitwert der letzten erfolgreichen Temperaturabfrage
+int l_last_valid_temperature 		= ERR_TEMP;	// Wert der letzten erfolgreichen Temperaturabfrage
+int l_last_valid_temperature_hour 	= -1;		// Zeitwert der letzten erfolgreichen Temperaturabfrage, Stunde
+int l_last_valid_temperature_minute	= -1;		// Zeitwert der letzten erfolgreichen Temperaturabfrage, Minuten
+
+unsigned int ZeitDifferenzMinuten(int h1, int m1, int h2, int m2) {
+	time_t time1;
+	time_t time2;
+
+	time1 = 60*m1 + 3600*h1;
+	time2 = 60*m2 + 3600*h2;
+
+	if (h2<h1) {
+		time2 += 24*3600;
+	}
+
+	return (unsigned int)(difftime(time2, time1) / 60);
+}
 
 //
 void showTemperature(int t, CRGB c) {
@@ -28,30 +43,30 @@ void showTemperature(int t, CRGB c) {
 	unsigned int jetzt;
 	unsigned int dauer;		// Zeitspanne in millis, seitdem keine Zeit mehr ermittelt wurde
 	unsigned int anz_leds;
-	
+	unsigned int letzte_gueltige_temperatur_vor_minuten;
+
+
 	resetLEDs();
 
 	if (t == ERR_TEMP) {
 		// die Temperatur konnte nicht ermittelt werden
 
-		jetzt = millis();
-		if (jetzt >= l_last_valid_temperature_millis) {
-			dauer = jetzt - l_last_valid_temperature_millis;
-		}
-		else {
-			dauer = jetzt;	// OK, ich weiß die Dauer ist in Wirklichkeit länger
-		}
-		
+
 		anz_leds = dauer / 1000 / 60;	// pro Minute eine LED
-		
+
 		if (anz_leds <= 0) {
 			anz_leds = 1;
 		}
 		else if (anz_leds>4) {
 			anz_leds = 4;
 		}
-		
-		if	(  (l_last_valid_temperature == ERR_TEMP) || (dauer > ERR_TEMP_TOLERANCE_MINUTES*60*1000)) {
+
+		letzte_gueltige_temperatur_vor_minuten = ZeitDifferenzMinuten(l_last_valid_temperature_minute, l_last_valid_temperature_hour, g_minute, g_hour);
+
+		if	(	l_last_valid_temperature == ERR_TEMP
+			|| ( letzte_gueltige_temperatur_vor_minuten > 15)
+			) {
+
 			// und es ist keine gueltige vorherige Temperatur bekannt
 			// oder die ist aelter als ERR_TEMP_TOLERANCE_MINUTES Minuten
 			setWord(W_GRAD, CRGB::Red);
@@ -79,7 +94,7 @@ void showTemperature(int t, CRGB c) {
 		setNumber(t, c);
 		setWord(W_GRAD, c);
 	}
-	
+
 	FastLED.show();
 }
 
@@ -129,7 +144,7 @@ CRGB GetTemperatureColor(int t) {
 String GetTemperatureRealLocation(String city) {
 	WiFiClient client;
 	HTTPClient http;            //Declare object of class HTTPClient
-	int httpCode;	
+	int httpCode;
 	String weatherstring;
 	String payload;
 	String location;
@@ -145,19 +160,19 @@ String GetTemperatureRealLocation(String city) {
 
 		// Die HTTP-Antwort ist zu groß zum Lesen-In-Einem-Stück >25kB
 		// also stückweise lesen und gleich suchen nach Location: ... [
-		
+
 		http.begin(client, weatherstring);
 		httpCode = http.GET();
 
 		if (httpCode >= HTTP_CODE_OK) {
 
 			payload="";
-			
+
 			// get lenght of document (is -1 when Server sends no Content-Length header)
 			int len = http.getSize();
 
 			location = "Ort war nicht in der Anfrageantwort enthalten. Antwortl&auml;nge=" + String(len);
-			
+
 			// create buffer for read
 			char buff[129] = { 0 };
 			buff[128] = (char)0;
@@ -170,7 +185,7 @@ String GetTemperatureRealLocation(String city) {
 
 			// read all data from server
 			while (http.connected() && (len > 0 || len == -1)) {
-			
+
 				// read up to 128 byte
 				int c = stream->readBytes(buff, std::min((size_t)len, sizeof(buff)));
 				buff[c]=0;
@@ -181,7 +196,7 @@ String GetTemperatureRealLocation(String city) {
 				if (len > 0) {
 					len -= c;
 				}
-			
+
 				if (location_start == -1) {
 					// Noch keinen Anfang (=="Location: ") gefunden
 					location_start = payload.indexOf("Location: ");
@@ -194,7 +209,7 @@ String GetTemperatureRealLocation(String city) {
 						payload = payload.substring(max((int)0,(int)(payload.length()-11)));
 					}
 				}
-			
+
 				if (location_start >=0 && location_end == -1) {
 					// Also der Anfang ist gefunden worden.
 					location_end = payload.indexOf("[");
@@ -214,7 +229,7 @@ String GetTemperatureRealLocation(String city) {
 
 		http.end();
 	}
-  
+
 	Serial.println(location);
 
 	return location;
@@ -224,7 +239,7 @@ String GetTemperatureRealLocation(String city) {
 // WETTER, Temperatur holen
 //
 int GetTemperature(String city) {
-	int httpCode;	
+	int httpCode;
 	int temperature;
 	HTTPClient http;            //Declare object of class HTTPClient
 	String weatherstring;
@@ -234,7 +249,7 @@ int GetTemperature(String city) {
 
 	temperature = ERR_TEMP; // is a kind of error code!
 	errorstring = "";		// kein Fehlertext
-	
+
 	if (WiFi.status() == WL_CONNECTED) {                    						//Check WiFi connection status
 		weatherstring = "http://wttr.in/" + city + "?format=\%t";    //Specify request destination
 
@@ -248,10 +263,10 @@ int GetTemperature(String city) {
 
 			temp_temperature = payload.substring(0, payload.length() - 4); 	//Format is "+x°C\n" wobei ° zwei Bytes einnimmt!
 
-			if ((temp_temperature.charAt(0) == '-') || (temp_temperature.charAt(0) == '+')) { 
+			if ((temp_temperature.charAt(0) == '-') || (temp_temperature.charAt(0) == '+')) {
 				temperature = temp_temperature.toInt();
 			}
-		} 
+		}
 		else {
 			Serial.print  ("ERROR getting TEMPERATURE: httpCode=");   Serial.println(httpCode);
 			errorstring = GetDatumZeitString() + String(" Fehler bei der Temperaturabfrage: Anfragefehler " + String(httpCode));
@@ -262,18 +277,19 @@ int GetTemperature(String city) {
 	else {
 		errorstring = GetDatumZeitString() + String(" Keine WLAN-Verbindung");
 	}
-	
+
 	if (temperature != ERR_TEMP) {
 		// es gibt eine gültige Temperatur
-		l_last_valid_temperature = temperature;
-		l_last_valid_temperature_millis = millis();
+		l_last_valid_temperature		= temperature;
+		l_last_valid_temperature_minute	= g_minute;
+		l_last_valid_temperature_hour	= g_hour;
 		errorstring = errorstring + "<br>\n" + GetDatumZeitString() + String(" ") + String(temperature) + String("&deg;C");
 	}
-	
+
 	Serial.println(temperature);
 
 	mywc_g_temperature_real_location = GetTemperatureRealLocation(city);
-	
+
 	if (errorstring != "") {
 		mywc_g_temperature_real_location = mywc_g_temperature_real_location+ String("<br>") + errorstring;
 	}

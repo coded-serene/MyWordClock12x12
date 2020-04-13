@@ -29,7 +29,7 @@
 //
 #define MyWC12x12_INO
 
-#include "MyWC12x12_config.h" 
+#include "MyWC12x12_config.h"
 
 #include <ESP8266WiFi.h>
 //#include <ESP8266WebServer.h>
@@ -77,15 +77,24 @@ CRGB leds[NUM_LEDS];
 config_t CONFIG;
 String ip;
 
+int g_hour		= -1;
+int g_minute	= -1;
+int g_heute_tag 	= -1;
+int g_heute_monat	= -1;
+int g_heute_jahr	= -1;
+
+int g_reboot_hour			= -1;
+int g_reboot_minute			= -1;
+int g_reboot_heute_tag 		= -1;
+int g_reboot_heute_monat	= -1;
+int g_reboot_heute_jahr		= -1;
+
 //
 // lokale Modulvariable
 //
-int hour = -1;
-int minute = -1;
+int hour 		= -1;
+int minute 		= -1;
 
-int heute_tag = -1;
-int heute_monat = -1;
-int heute_jahr = -1;
 
 static int myMode;			// aktueller Anzeigemodus für den Zustandsautomaten
 static bool mode_change;
@@ -121,7 +130,7 @@ void changeLocale() {
 
   if (CONFIG.locale == L_FRANKEN) {
     Serial.println(L_W_FRANKEN);
-    
+
 	words_umschaltung_schwellwert = L_S_FRANKEN;
     wordsindex_minutes[3] = W_VIERTEL;
     wordsindex_minutes[4] = W_ZEHN_VOR_HALB;
@@ -130,7 +139,7 @@ void changeLocale() {
   }
   else {
     Serial.println(L_W_DEUTSCHLAND);
-	
+
     words_umschaltung_schwellwert = L_S_DEUTSCHLAND;
     wordsindex_minutes[3] = W_VIERTEL_NACH;
     wordsindex_minutes[4] = W_ZWANZIG_NACH;
@@ -212,7 +221,7 @@ void loadConfig() {
   CONFIG.color_fg.b 				= doc["color_fg_b"].as<int>();
 
   CONFIG.brightness 				= doc["brightness"].as<int>();
-  
+
   CONFIG.timezone 					= doc["timezone"].as<int>();
   //timeClient.setTimeOffset(CONFIG.timezone * 3600);
   configTime(3600 * CONFIG.timezone, 1 * 3600, "0.pool.ntp.org", "time.nist.gov", "1.pool.ntp.org");
@@ -265,7 +274,7 @@ void saveConfig() {
   Serial.println("Save config.");
 
   StaticJsonDocument<1024> doc;
-  
+
   doc["color_bg_r"] 				= CONFIG.color_bg.r;
   doc["color_bg_g"] 				= CONFIG.color_bg.g;
   doc["color_bg_b"] 				= CONFIG.color_bg.b;
@@ -320,9 +329,9 @@ void testPower() {
 
 	for (int i=0; i<NUM_LEDS; i++) {
 	  leds[i] = CRGB::White;
-	
+
 	  FastLED.show();
-	  
+
 	  delay(1000);
 	}
 
@@ -388,37 +397,16 @@ bool getLocalTime(struct tm *info, uint32_t ms) {
   return false;
 }
 
-void GetZeit(int *stunden, int *minuten) {
-	struct tm tmstruct;
-	
-	getLocalTime(&tmstruct, 5000);
-	
-	*stunden = tmstruct.tm_hour;
-	*minuten = tmstruct.tm_min;
-}
-
-void GetDatum(int *tag, int *monat, int *jahr) {
-
-	struct tm tmstruct;
-
-	// Datum herausfinden
-	tmstruct.tm_year = 0;
-	getLocalTime(&tmstruct, 5000);
-	//Serial.printf("\nNow is : %d-%02d-%02d %02d:%02d:%02d\n", (tmstruct.tm_year) + 1900, (tmstruct.tm_mon) + 1, tmstruct.tm_mday, tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
-
-	*tag = tmstruct.tm_mday;
-	*monat = (tmstruct.tm_mon) + 1;
-	*jahr = (tmstruct.tm_year) + 1900;
-}
-
-String GetDatumZeitString() {
-	char buffer[32];
+void GetTimeAndDate(int *stunden, int *minuten, int *tag, int *monat, int *jahr) {
 	struct tm tmstruct;
 
 	getLocalTime(&tmstruct, 5000);
-	(void)strftime(buffer, 32, "%d.%B %Y %H:%M", &tmstruct);
-	
-	return String(buffer);
+
+	*stunden	= tmstruct.tm_hour;
+	*minuten	= tmstruct.tm_min;
+	*tag		= tmstruct.tm_mday;
+	*monat		= tmstruct.tm_mon + 1;
+	*jahr		= tmstruct.tm_year + 1900;
 }
 
 // Funktionen zum Arbeiten mit dem LED-Streifen
@@ -436,10 +424,10 @@ void setBrightness(int b) {
 	if (b == BRIGHTNESS_AUTO) {
 		b = (jetztDunkelschaltung(hour, minute)) ? CONFIG.dunkelschaltung_brightness : CONFIG.brightness;
 	}
-	
+
 	if ((b<0)||(b>100))
 		return;
-	
+
 	FastLED.setBrightness((int)((float)b * 2.55));
 }
 
@@ -551,13 +539,13 @@ void startLaufschrift(String text, CRGB c = CRGB::White) {
 
 int stepLaufschrift() {
 	int i;
-	
+
 	i=ScrollingMsg.UpdateText();
-	
+
 	if (i!= -1) {
 		FastLED.show();
 	}
-	
+
 	return i;
 }
 
@@ -565,7 +553,7 @@ void showLaufschrift(String text, CRGB c = CRGB::White) {
   char buffer[256];
 
   Serial.println("Laufschrift " + text);
-  
+
   text = "   " + text;      // smooth in
 
   text.toCharArray(buffer, 256);
@@ -574,7 +562,7 @@ void showLaufschrift(String text, CRGB c = CRGB::White) {
 
   ScrollingMsg.SetText((unsigned char *)buffer, strlen(buffer));
   ScrollingMsg.SetTextColrOptions(COLR_RGB | COLR_SINGLE, c.r, c.g, c.b);
-  
+
   while (ScrollingMsg.UpdateText() != -1)
   {
 	FastLED.show();
@@ -603,12 +591,12 @@ void setHerz() {
 		setWord(W_HERZ, CRGB::Red);
 		break;
   case HERZ_DATUM:
-		if (heute_tag * 100 + heute_monat == CONFIG.dat_herz) {
+		if (g_heute_tag * 100 + g_heute_monat == CONFIG.dat_herz) {
 			setWord(W_HERZ, CRGB::Red);
 		}
 		break;
   case HERZ_STD_DATUM:
-		if (heute_tag * 100 + heute_monat == CONFIG.dat_herz) {
+		if (g_heute_tag * 100 + g_heute_monat == CONFIG.dat_herz) {
 			setWord(W_HERZ, CRGB::Red);
 		} else {
 			setWord(W_HERZ, CONFIG.color_fg);
@@ -626,7 +614,7 @@ void showWord(int w, CRGB c = CRGB::White) {
   setWord(w, c);
   FastLED.show();
 }
-  
+
 void showWLAN(CRGB c) {
   resetLEDs();
   setWord(W_WLAN, c);
@@ -655,7 +643,7 @@ void showTime(int hour, int minute) {
   if (WiFi.status() != WL_CONNECTED) {
 	setWord(W_WLAN, CRGB::Red);
   }
-  
+
   setWord(W_ES_IST, CONFIG.color_fg);
 
   // Minuten
@@ -750,14 +738,14 @@ void restart() {
 	// evtl. geaenderte Helligkeit durchsetzen
 	setBrightness(BRIGHTNESS_AUTO);
 
-#ifdef TEMPERATURE	
+#ifdef TEMPERATURE
 	// evtl. wurde der Ort geaendert, also sicherheitshalber die Temperatur neu holen
 	mywc_g_temperature = GetTemperature(CONFIG.city);
 #endif
-	
+
 	// vllt. ist die Regionaleinstellung geändert...
 	changeLocale();
-	
+
 	// Zeitanzeige in loop() erzwingen
 	hour = -1;
 }
@@ -767,8 +755,8 @@ void restart() {
 //
 void setup() {
 	IPAddress ipL;
-    
-	
+
+
 	Serial.begin(74880);
 
 #ifdef GEBURTSTAGE
@@ -852,7 +840,7 @@ void setup() {
 			  type = "sketch";
 			} else { // U_SPIFFS
 			  type = "filesystem";
-			}	
+			}
 
 			// NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
 			Serial.println("OTA start updating " + type);
@@ -877,7 +865,7 @@ void setup() {
 				Serial.println("End Failed");
 			}
 	});
-	
+
 	ArduinoOTA.begin();             //OTA initialization
 	Serial.println("OTA ready");
 #endif
@@ -885,10 +873,13 @@ void setup() {
 	// start webserver
 	startServer();
 
+	GetTimeAndDate(&g_reboot_hour, &g_reboot_minute, &g_reboot_heute_tag, &g_reboot_heute_monat, &g_reboot_heute_jahr);
+
+
 	// Configure time-service, mit Sommer/Winterzeit von einer Stunde
 	configTime(3600 * CONFIG.timezone, 1 * 3600, "0.pool.ntp.org", "time.nist.gov", "1.pool.ntp.org");
 
-	heute_tag = -1;
+	g_heute_tag = -1;
 	myMode = MODE_TEMP;			// aktueller Anzeigemodus für den Zustandsautomaten
 	mode_change = true;
 
@@ -898,96 +889,78 @@ void setup() {
 }
 
 void loop() {
-	int h;
-	int m;
+//	int h;
+//	int m;
 	unsigned long jetzt;
 
-	//Serial.println("Start Loop - MODE " + String(myMode) + " mode_change=" + String(mode_change));
 	//
 	// Zeit aktualisieren
 	//
-	//timeClient.update();
-	//h = timeClient.getHours();
-	//m = timeClient.getMinutes();
-	
-	GetZeit(&h, &m);
-
-	//
-	// Datum ermitteln, wenn es 0-Uhr ist, oder das Datum unbekannt ist
-	//
-    if ((h == 0 && m == 0) || heute_tag == -1 || heute_monat == -1 || heute_jahr == -1 ) {
-      // einmal pro Tag das Datum holen, oder wenn einer der heute_*-Werte unbestimmt ist
-      GetDatum(&heute_tag, &heute_monat, &heute_jahr);
-	  Serial.println("Neues Datum geholt " + String(heute_tag) + "." + String(heute_monat) + "." + String(heute_jahr));
-    }
-
-	//Serial.println("Loop 1 - MODE " + String(myMode) + " mode_change=" + String(mode_change));
+	GetTimeAndDate(&g_hour, &g_minute, &g_heute_tag, &g_heute_monat, &g_heute_jahr);
 
 	//
 	// Diese Aktionen sollten nur noch einmal pro Minute laufen
 	//
-	if (h != hour || m != minute) {
+	if (hour != g_hour || minute != g_minute) {
 
 		// neue Minute
-		hour 		= h;
-		minute 		= m;
+		hour 		= g_hour;
+		minute 		= g_minute;
 
 		// wir starten mit der Temperatur....
 		myMode 		= MODE_TEMP;
 		mode_change	= true;
-		
+
 		// Falls gerade die Dunkelschaltung erfolgt...
 		setBrightness(BRIGHTNESS_AUTO);
-		
-		if (minute % 5 == 0) {
+
+		if (g_minute % 5 == 0) {
 			// alle 5 Minuten
 			// Falls das WLAN nicht funktioniert, reconnect versuchen
 			(void)wifiManager.autoConnect("WordClock");
 		}
-		
-		Serial.println("Neue Minute " + String(minute));
 	}
-	
+
 #ifdef TEMPERATURE
 	//
 	// Temperatur alle 15 Minuten aktualisieren, oder falls keine Temperatur ermittelt werden konnte
 	//
 	// im Idealfall wird die Temperatur nur alle 15 Minuten ermittelt
 	//
-	if	(	CONFIG.temp_active != TEMPERATURE_AUS 		// wenn überhaupt das Temperatur-Feature aktiviert ist
-		&& 	temperatur_minute != minute  				// und zu dieser Minute noch keine Temperaturermittling stattgefunden hat
-		&& 	(minute == 0 || minute == 15 || minute == 30 || minute == 45 || mywc_g_temperature == ERR_TEMP) 	// und entweder die Temperatur ermittelt werden soll (alle Viertelstunde) oder muss (keine aktuelle Temperatur)
+	if	(	CONFIG.temp_active != TEMPERATURE_AUS 						// wenn überhaupt das Temperatur-Feature aktiviert ist
+		&& 	temperatur_minute  != g_minute  							// und zu dieser Minute noch keine Temperaturermittling stattgefunden hat
+		&& 	((g_minute % 15) == 0 || mywc_g_temperature == ERR_TEMP) 	// und entweder die Temperatur ermittelt werden soll (alle Viertelstunde) oder muss (keine aktuelle Temperatur)
 		) {
-		temperatur_minute = minute;
+		temperatur_minute = g_minute;
 		mywc_g_temperature = GetTemperature(CONFIG.city);
 	}
-#endif  
-	
+#endif
+
 	if (mode_change == true) {
-		
+
 		mode_change = false;
-		
+
 		Serial.println("ModeChange " + String(myMode));
-		
+
 		switch (myMode) {
-			
+
 		case MODE_TIME:
 
-			showTime(hour,	minute);
+			showTime(g_hour, g_minute);
 			break;
-		
+
 #ifdef GEBURTSTAGE
 		case MODE_BIRTHDAY:
 #ifdef LAUFSCHRIFT
-			if (isGeburtstagheut(heute_tag, heute_monat) && ((m % 5) == 0)) {
-				
+			if (isGeburtstagheut(g_heute_tag, g_heute_monat) && ((g_minute % 5) == 0)) {
+
 				Serial.println("Starte Geburtstag");
-				
+
 				// Zu dieser Minute ist die Geburtstagslaufschrift noch nicht erschienen
 				// und es gibt einen Geburtstag
-				startLaufschrift("HAPPY BIRTHDAY," + getGebName(heute_tag, heute_monat) + "!");
+				startLaufschrift("HAPPY BIRTHDAY," + getGebName(g_heute_tag, g_heute_monat) + "!");
 				geburtstag_ende = false;
-				geburtstag_minute = m;
+				geburtstag_minute = g_minute;
 				geburtstag_millis= millis();
 			}
 #else
@@ -995,10 +968,10 @@ void loop() {
 			// myMode = MODE_TIME;
 			// Serial.println("MODE_TIME");
 			// mode_change = true;
-			
+
 #endif
 			break;
- 
+
 #endif
 
 #ifdef TEMPERATURE
@@ -1007,18 +980,16 @@ void loop() {
 			// Auf Temperaturanzeige umschalten, wenn eine Temperatur ermittelt wurde, Temperaturanzeige aktiv ist und zu dieser Minute noch keine Temperatur angezeigt wurde
 			// temperatur_minute ist die Zeit zu der zuletzt die Temperatur angezeigt wurde
 			//
-			Serial.println("TEMP: " + String(minute) + " CONFIG.temp_active=" + String(CONFIG.temp_active));
-			
-			if (	CONFIG.temp_active == TEMPERATURE_MINUTE 
-				|| (CONFIG.temp_active == TEMPERATURE_5MINUTE && ((minute%5)==0))
+			if (	CONFIG.temp_active == TEMPERATURE_MINUTE
+				|| (CONFIG.temp_active == TEMPERATURE_5MINUTE && ((g_minute%5)==0))
 				) {
 				// temperaturanzeige starten
-				temperatur_minute = minute;			// zu dieser Minute die Temperaturanzeige nicht mehr starten
+				temperatur_minute = g_minute;			// zu dieser Minute die Temperaturanzeige nicht mehr starten
 				temperatur_millis = millis();		// zur Realisierung einer Anzeigedauer diese Startzeit der Anzeige merken
 
 				showTemperature(mywc_g_temperature, GetTemperatureColor(mywc_g_temperature));
 				// Temperaturanzeige wird in mode_temperatur beendet
-			} 
+			}
 			else {
 				// zu dieser Minute keine Temperaturanzeige
 #ifdef GEBURTSTAGE
@@ -1029,30 +1000,30 @@ void loop() {
 				myMode = MODE_TIME;
 				Serial.println("MODE_TIME");
 				mode_change = true;
-#endif				
+#endif
 			}
-			
+
 			break;
-#endif	
+#endif
 		default:
 
-			showTime(hour,	minute);
+			showTime(g_hour, g_minute);
 		break;
-		
+
 		}
 	}
 	else {
-		
+
 		//Serial.println("No Mode Change " + String(myMode) + " mode_change=" + String(mode_change));
-		
+
 		// Diese Aktionen werden durchlaufen, solange der Modus unverändert ist
 		//
 		switch (myMode) {
-			
+
 		case MODE_TIME:
 			// Nix tun. Die Zeit sollte bereits angezeigt werden und dann warten, auf eine neue Minute
 			break;
-			
+
 #ifdef TEMPERATURE
 		case MODE_TEMP:
 			// Temperatur ist angezeigt worden,
@@ -1060,10 +1031,10 @@ void loop() {
 			//		und getstartet um temperatur_millis
 			// 	Ausschalten nach x Milisekunden
 			jetzt = millis();
-			
+
 
 			if (jetzt>temperatur_millis+TEMPERATURE_DURATION || jetzt < temperatur_millis) {
-				Serial.println("Ende Temp");			
+				Serial.println("Ende Temp");
 #ifdef GEBURTSTAGE
 				myMode = MODE_BIRTHDAY;
 				Serial.println("MODE_BIRTHDAY");
@@ -1077,27 +1048,27 @@ void loop() {
 			else {
 				;	// nix tun, nur auf den nächsten Durchlauf warten, die Temperatur wird angezeigt, aber die Zeit TEMPERATURE_DURATION ist noch nicht abgelaufen
 			}
-			
+
 			break;
 #endif
-		
+
 #ifdef GEBURTSTAGE
 		case MODE_BIRTHDAY:
-		
+
 			if (!geburtstag_ende) {
 				jetzt = millis();
-				
+
 				Serial.println("Warte Geburtstag " + String(jetzt) + " geburtstag_millis=" + String(geburtstag_millis) + " Diff=" + String(jetzt - geburtstag_millis));
-				
+
 				if (jetzt>geburtstag_millis+LAUFSCHRIFT_SPEED || jetzt < geburtstag_millis) {
 					//einen Schritt in der Laufschrift
 					geburtstag_ende = stepLaufschrift();
 					geburtstag_millis = jetzt;
-				
+
 				}
-			} 
+			}
 			else {
-				Serial.println("Ende Geburtstag");		
+				Serial.println("Ende Geburtstag");
 				myMode = MODE_TIME;
 				Serial.println("MODE_TIME");
 				mode_change = true;
@@ -1106,29 +1077,29 @@ void loop() {
 #endif
 		}
 	}
-	
-	
+
+
 	//
 	// Diese Aktionen bei jedem Schleifendurchlauf
 	//
 #ifdef GEBURTSTAGE
-	if (isGeburtstagheut(heute_tag, heute_monat) && myMode == MODE_TIME) {
+	if (isGeburtstagheut(g_heute_tag, g_heute_monat) && myMode == MODE_TIME) {
 		EVERY_N_MILLISECONDS( 50 ) {
 			setRainbowColor();
 			FastLED.show();
 		}
 	}
 #endif
- 
+
 	//
 	// evtl. Update Einspielen
 	//
 #ifdef FEATURE_OTA
-	ArduinoOTA.handle();	
+	ArduinoOTA.handle();
 #endif
- 
+
 	//
 	// Webserver bedienen
 	//
-	handleClientServer(); 
+	handleClientServer();
 }
