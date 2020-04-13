@@ -409,6 +409,17 @@ void GetTimeAndDate(int *stunden, int *minuten, int *tag, int *monat, int *jahr)
 	*jahr		= tmstruct.tm_year + 1900;
 }
 
+String GetDatumZeitString() {
+  struct tm tmstruct;
+  char buffer[80];
+
+
+  getLocalTime(&tmstruct, 5000);
+
+  strftime(buffer, 80, "%d.%m.%Y %H:%M", &tmstruct);
+
+  return String(buffer);
+}
 // Funktionen zum Arbeiten mit dem LED-Streifen
 //
 // set-Funktionen setzen nur die Informationen im Array für die LEDs

@@ -24,117 +24,116 @@ int l_last_valid_temperature_hour 	= -1;		// Zeitwert der letzten erfolgreichen 
 int l_last_valid_temperature_minute	= -1;		// Zeitwert der letzten erfolgreichen Temperaturabfrage, Minuten
 
 unsigned int ZeitDifferenzMinuten(int h1, int m1, int h2, int m2) {
-	time_t time1;
-	time_t time2;
+  time_t time1;
+  time_t time2;
 
-	time1 = 60*m1 + 3600*h1;
-	time2 = 60*m2 + 3600*h2;
+  time1 = 60*m1 + 3600*h1;
+  time2 = 60*m2 + 3600*h2;
 
-	if (h2<h1) {
-		time2 += 24*3600;
-	}
+  if (h2<h1) {
+    time2 += 24*3600;
+  }
 
-	return (unsigned int)(difftime(time2, time1) / 60);
+  return (unsigned int)(difftime(time2, time1) / 60);
 }
 
 //
 void showTemperature(int t, CRGB c) {
 
-	unsigned int jetzt;
-	unsigned int dauer;		// Zeitspanne in millis, seitdem keine Zeit mehr ermittelt wurde
-	unsigned int anz_leds;
-	unsigned int letzte_gueltige_temperatur_vor_minuten;
+  unsigned int jetzt;
+  unsigned int dauer;		// Zeitspanne in millis, seitdem keine Zeit mehr ermittelt wurde
+  unsigned int anz_leds;
+  unsigned int letzte_gueltige_temperatur_vor_minuten;
 
 
-	resetLEDs();
+  resetLEDs();
 
-	if (t == ERR_TEMP) {
-		// die Temperatur konnte nicht ermittelt werden
+  if (t == ERR_TEMP) {
+    // die Temperatur konnte nicht ermittelt werden
 
+    letzte_gueltige_temperatur_vor_minuten = ZeitDifferenzMinuten(l_last_valid_temperature_minute, l_last_valid_temperature_hour, g_minute, g_hour);
 
-		anz_leds = dauer / 1000 / 60;	// pro Minute eine LED
+    anz_leds = letzte_gueltige_temperatur_vor_minuten;	// pro Minute eine LED
 
-		if (anz_leds <= 0) {
-			anz_leds = 1;
-		}
-		else if (anz_leds>4) {
-			anz_leds = 4;
-		}
+    if (anz_leds <= 0) {
+      anz_leds = 1;
+    }
+    else if (anz_leds>4) {
+      anz_leds = 4;
+    }
 
-		letzte_gueltige_temperatur_vor_minuten = ZeitDifferenzMinuten(l_last_valid_temperature_minute, l_last_valid_temperature_hour, g_minute, g_hour);
+    if	(	l_last_valid_temperature == ERR_TEMP
+        || ( letzte_gueltige_temperatur_vor_minuten > 15)
+        ) {
+      // und es ist keine gueltige vorherige Temperatur bekannt
+      // oder die ist aelter als ERR_TEMP_TOLERANCE_MINUTES Minuten
+      setWord(W_GRAD, CRGB::Red);
+    }
+    else {
+      setWord(wordsindex_single_m[anz_leds], CRGB::Red);
+      t = l_last_valid_temperature;
+    }
+  }
 
-		if	(	l_last_valid_temperature == ERR_TEMP
-			|| ( letzte_gueltige_temperatur_vor_minuten > 15)
-			) {
+  if (t != ERR_TEMP) {
+    // es ist eine gültige Temperatur ermittelt worden, oder die temperatur ist auf die letzte Gültige gesetzt worden
+    if (t < -39 ) {
+      // die aber nicht angezeigt werden kann (zu klein)
+      t=-39;
+      setWord(W_VIER_PUNKTE, CRGB::Yellow);
+    }
 
-			// und es ist keine gueltige vorherige Temperatur bekannt
-			// oder die ist aelter als ERR_TEMP_TOLERANCE_MINUTES Minuten
-			setWord(W_GRAD, CRGB::Red);
-		}
-		else {
-			setWord(wordsindex_single_m[anz_leds], CRGB::Red);
-			t = l_last_valid_temperature;
-		}
-	}
+    if (t > 39) {
+      // die aber nicht angezeigt werden kann (zu groß)
+      t= 39;
+      setWord(W_VIER_PUNKTE, CRGB::Yellow);
+    }
 
-	if (t != ERR_TEMP) {
-		// es ist eine gültige Temperatur ermittelt worden, oder die temperatur ist auf die letzte Gültige gesetzt worden
-		if (t < -39 ) {
-			// die aber nicht angezeigt werden kann (zu klein)
-			t=-39;
-			setWord(W_VIER_PUNKTE, CRGB::Yellow);
-		}
-		if (t > 39) {
-			// die aber nicht angezeigt werden kann (zu groß)
-			t= 39;
-			setWord(W_VIER_PUNKTE, CRGB::Yellow);
-		}
+    setWord(W_ES_IST, c);
+    setNumber(t, c);
+    setWord(W_GRAD, c);
+  }
 
-		setWord(W_ES_IST, c);
-		setNumber(t, c);
-		setWord(W_GRAD, c);
-	}
-
-	FastLED.show();
+  FastLED.show();
 }
 
 // Farbabstufung der Temperaturanzeige
 //
 CRGB GetTemperatureColor(int t) {
-	// -39 bis -5	blau
-	// -4  bis 5	hellblau
-	// 6   bis 15   gruen
-	// 16  bis 20   hellgruen
-	// 21  bis 25   gelb
-	// 26  bis 30   orange
-	// 31  bis 39   rot
-	if (t<= -40) {
-		return CRGB::White;
-	}
-	else if (t<=-5) {
-		return CRGB::Blue;
-	}
-	else if (t<=5) {
-		return CRGB::LightSkyBlue;
-	}
-	else if (t<=15) {
-		return CRGB::SeaGreen;
-	}
-	else if (t<=20) {
-		return CRGB::Green;
-	}
-	else if (t<=25) {
-		return CRGB::Yellow;
-	}
-	else if (t<=30) {
-		return CRGB::Orange;
-	}
-	else if (t<=39) {
-		return CRGB::Red;
-	}
-	else {
-		return CRGB::White;
-	}
+  // -39 bis -5	blau
+  // -4  bis 5	hellblau
+  // 6   bis 15   gruen
+  // 16  bis 20   hellgruen
+  // 21  bis 25   gelb
+  // 26  bis 30   orange
+  // 31  bis 39   rot
+  if (t<= -40) {
+    return CRGB::White;
+  }
+  else if (t<=-5) {
+    return CRGB::Blue;
+  }
+  else if (t<=5) {
+    return CRGB::LightSkyBlue;
+  }
+  else if (t<=15) {
+    return CRGB::SeaGreen;
+  }
+  else if (t<=20) {
+    return CRGB::Green;
+  }
+  else if (t<=25) {
+    return CRGB::Yellow;
+  }
+  else if (t<=30) {
+    return CRGB::Orange;
+  }
+  else if (t<=39) {
+    return CRGB::Red;
+  }
+  else {
+    return CRGB::White;
+  }
 }
 
 
@@ -142,165 +141,161 @@ CRGB GetTemperatureColor(int t) {
 // WETTER, Ort holen
 //
 String GetTemperatureRealLocation(String city) {
-	WiFiClient client;
-	HTTPClient http;            //Declare object of class HTTPClient
-	int httpCode;
-	String weatherstring;
-	String payload;
-	String location;
-	int location_start;
-	int location_end;
+  WiFiClient client;
+  HTTPClient http;            //Declare object of class HTTPClient
+  int httpCode;
+  String weatherstring;
+  String payload;
+  String location;
+  int location_start;
+  int location_end;
 
+  if (WiFi.status() == WL_CONNECTED) {                						//Check WiFi connection status
+    weatherstring = "http://wttr.in/" + city + "?1&lang=en";    //Specify request destination
 
+    Serial.println(weatherstring);
 
-	if (WiFi.status() == WL_CONNECTED) {                    						//Check WiFi connection status
-		weatherstring = "http://wttr.in/" + city + "?1&lang=en";    //Specify request destination
+    // Die HTTP-Antwort ist zu groß zum Lesen-In-Einem-Stück >25kB also stückweise lesen und gleich suchen nach Location: ... [
 
-		Serial.println(weatherstring);
+    http.begin(client, weatherstring);
+    httpCode = http.GET();
 
-		// Die HTTP-Antwort ist zu groß zum Lesen-In-Einem-Stück >25kB
-		// also stückweise lesen und gleich suchen nach Location: ... [
+    if (httpCode >= HTTP_CODE_OK) {
 
-		http.begin(client, weatherstring);
-		httpCode = http.GET();
+      payload="";
 
-		if (httpCode >= HTTP_CODE_OK) {
+      // get lenght of document (is -1 when Server sends no Content-Length header)
+      int len = http.getSize();
 
-			payload="";
+      location = "Ort war nicht in der Anfrageantwort enthalten. Antwortl&auml;nge=" + String(len);
 
-			// get lenght of document (is -1 when Server sends no Content-Length header)
-			int len = http.getSize();
+      // create buffer for read
+      char buff[129] = { 0 };
+      buff[128] = (char)0;
 
-			location = "Ort war nicht in der Anfrageantwort enthalten. Antwortl&auml;nge=" + String(len);
+      // get tcp stream
+      WiFiClient *stream = &client;
+      location_start=-1;
+      location_end=-1;
 
-			// create buffer for read
-			char buff[129] = { 0 };
-			buff[128] = (char)0;
+      // read all data from server
+      while (http.connected() && (len > 0 || len == -1)) {
 
-			// get tcp stream
-			WiFiClient *stream = &client;
+        // read up to 128 byte
+        int c = stream->readBytes(buff, std::min((size_t)len, sizeof(buff)));
+        buff[c]=0;
 
-			location_start=-1;
-			location_end=-1;
+        payload += String(buff); //Serial.println("Lese. Payload=" + payload);
 
-			// read all data from server
-			while (http.connected() && (len > 0 || len == -1)) {
+        if (len > 0) {
+          len -= c;
+        }
 
-				// read up to 128 byte
-				int c = stream->readBytes(buff, std::min((size_t)len, sizeof(buff)));
-				buff[c]=0;
+        if (location_start == -1) { // Noch keinen Anfang (=="Location: ") gefunden
+          location_start = payload.indexOf("Location: ");
 
-				payload += String(buff);
-				//Serial.println("Lese. Payload=" + payload);
+          if (location_start >=0) {
+            // aber in diesem frisch gelesenen Puffer
+            payload = payload.substring(location_start);
+            Serial.println("Los gehts. Payload=" + payload);
+          }
+          else {
+            // Nicht gefunden. payload kürzen, aber die letzten 11 Zeichen behalten (falls da ein Teil des "Location: " drin steckt
+            payload = payload.substring(max((int)0,(int)(payload.length()-11)));
+          }
+        }
 
-				if (len > 0) {
-					len -= c;
-				}
+        if (location_start >=0 && location_end == -1) {
+          // Also der Anfang ist gefunden worden.
+          location_end = payload.indexOf("[");
+          if (location_end >= 0) {
+            // 0 kann nicht sein, da der String definitiv mit "Location:" anfängt
+            location = payload.substring(10, location_end -1);
+            len = 0;
+          }
+          // else
+          // wenn nicht gefunden, den Puffer nochmal auslesen und an die payload anhängen
+        }
+      }
+    }
+    else {
+      Serial.println("ERROR getting TEMPERATURE Location: httpCode=" +  String(httpCode));
+      location = GetDatumZeitString() + String(" Fehler bei der Ortsbestimmung: Anfragefehler " + String(httpCode));
+    }
 
-				if (location_start == -1) {
-					// Noch keinen Anfang (=="Location: ") gefunden
-					location_start = payload.indexOf("Location: ");
-					if (location_start >=0) {
-						// aber in diesem frisch gelesenen Puffer
-						payload = payload.substring(location_start);
-						Serial.println("Los gehts. Payload=" + payload);
-					} else {
-						// Nicht gefunden. payload kürzen, aber die letzten 11 Zeichen behalten (falls da ein Teil des "Location: " drin steckt
-						payload = payload.substring(max((int)0,(int)(payload.length()-11)));
-					}
-				}
+    http.end();
+  }
 
-				if (location_start >=0 && location_end == -1) {
-					// Also der Anfang ist gefunden worden.
-					location_end = payload.indexOf("[");
-					if (location_end >= 0) {
-						// 0 kann nicht sein, da der String definitiv mit "Location:" anfängt
-						location = payload.substring(10, location_end -1);
-						len = 0;
-					}
-					// else
-					// wenn nicht gefunden, den Puffer nochmal auslesen und an die payload anhängen
-				}
-			}
-		} else {
-			Serial.println("ERROR getting TEMPERATURE Location: httpCode=" +  String(httpCode));
-			location = GetDatumZeitString() + String(" Fehler bei der Ortsbestimmung: Anfragefehler " + String(httpCode));
-		}
+  Serial.println(location);
 
-		http.end();
-	}
-
-	Serial.println(location);
-
-	return location;
+  return location;
 }
 
 //
 // WETTER, Temperatur holen
 //
 int GetTemperature(String city) {
-	int httpCode;
-	int temperature;
-	HTTPClient http;            //Declare object of class HTTPClient
-	String weatherstring;
-	String payload;
-	String temp_temperature;
-	String errorstring;
+  int httpCode;
+  int temperature;
+  HTTPClient http;            //Declare object of class HTTPClient
+  String weatherstring;
+  String payload;
+  String temp_temperature;
+  String errorstring;
 
-	temperature = ERR_TEMP; // is a kind of error code!
-	errorstring = "";		// kein Fehlertext
+  temperature = ERR_TEMP; // is a kind of error code!
+  errorstring = "";		// kein Fehlertext
 
-	if (WiFi.status() == WL_CONNECTED) {                    						//Check WiFi connection status
-		weatherstring = "http://wttr.in/" + city + "?format=\%t";    //Specify request destination
+  if (WiFi.status() == WL_CONNECTED) {                    						//Check WiFi connection status
+    weatherstring = "http://wttr.in/" + city + "?format=\%t";    //Specify request destination
 
-		Serial.println(weatherstring);
+    Serial.println(weatherstring);
 
-		http.begin(weatherstring);
-		httpCode = http.GET();
+    http.begin(weatherstring);
+    httpCode = http.GET();
 
-		if (httpCode >= HTTP_CODE_OK) {
-			payload = http.getString();                  						//Get the response payload
+    if (httpCode >= HTTP_CODE_OK) {
+      payload = http.getString();                  						//Get the response payload
 
-			temp_temperature = payload.substring(0, payload.length() - 4); 	//Format is "+x°C\n" wobei ° zwei Bytes einnimmt!
+      temp_temperature = payload.substring(0, payload.length() - 4); 	//Format is "+x°C\n" wobei ° zwei Bytes einnimmt!
 
-			if ((temp_temperature.charAt(0) == '-') || (temp_temperature.charAt(0) == '+')) {
-				temperature = temp_temperature.toInt();
-			}
-		}
-		else {
-			Serial.print  ("ERROR getting TEMPERATURE: httpCode=");   Serial.println(httpCode);
-			errorstring = GetDatumZeitString() + String(" Fehler bei der Temperaturabfrage: Anfragefehler " + String(httpCode));
+      if ((temp_temperature.charAt(0) == '-') || (temp_temperature.charAt(0) == '+')) {
+        temperature = temp_temperature.toInt();
+      }
+    }
+    else {
+      Serial.print  ("ERROR getting TEMPERATURE: httpCode=");   Serial.println(httpCode);
+      errorstring = GetDatumZeitString() + String(" Fehler bei der Temperaturabfrage: Anfragefehler " + String(httpCode));
+    }
+    http.end();                                           						//Close connection
+  }
+  else {
+    errorstring = GetDatumZeitString() + String(" Keine WLAN-Verbindung");
+  }
 
-		}
-		http.end();                                           						//Close connection
-	}
-	else {
-		errorstring = GetDatumZeitString() + String(" Keine WLAN-Verbindung");
-	}
+  if (temperature != ERR_TEMP) {
+    // es gibt eine gültige Temperatur
+    l_last_valid_temperature		    = temperature;
+    l_last_valid_temperature_minute	= g_minute;
+    l_last_valid_temperature_hour	  = g_hour;
+    errorstring = errorstring + "<br>\n" + GetDatumZeitString() + String(" ") + String(temperature) + String("&deg;C");
+  }
 
-	if (temperature != ERR_TEMP) {
-		// es gibt eine gültige Temperatur
-		l_last_valid_temperature		= temperature;
-		l_last_valid_temperature_minute	= g_minute;
-		l_last_valid_temperature_hour	= g_hour;
-		errorstring = errorstring + "<br>\n" + GetDatumZeitString() + String(" ") + String(temperature) + String("&deg;C");
-	}
+  Serial.println(temperature);
 
-	Serial.println(temperature);
+  mywc_g_temperature_real_location = GetTemperatureRealLocation(city);
 
-	mywc_g_temperature_real_location = GetTemperatureRealLocation(city);
+  if (errorstring != "") {
+    mywc_g_temperature_real_location = mywc_g_temperature_real_location+ String("<br>") + errorstring;
+  }
 
-	if (errorstring != "") {
-		mywc_g_temperature_real_location = mywc_g_temperature_real_location+ String("<br>") + errorstring;
-	}
-
-	return temperature;
+  return temperature;
 }
 
 void testTemperatur() {
-	for (int i=-39; i<40; i++) {
-		showTemperature(i, GetTemperatureColor(i));
-		delay(500);
-	}
+  for (int i=-39; i<40; i++) {
+  showTemperature(i, GetTemperatureColor(i));
+  delay(500);
+  }
 }
 #endif
