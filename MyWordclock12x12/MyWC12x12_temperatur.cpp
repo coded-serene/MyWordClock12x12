@@ -14,30 +14,44 @@
 //
 // globale Variable
 //
-int mywc_g_temperature = ERR_TEMP;  // temperatur
-String mywc_g_temperature_real_location;	// von wttr.in tatsächlich genutzter Ort, zur Ausgabe auf der Webseite
+int mywc_g_temperature 				= ERR_TEMP;	// temperatur
+String mywc_g_temperature_real_location;		// von wttr.in tatsächlich genutzter Ort, zur Ausgabe auf der Webseite
 
 
 // Modulvariable
-int l_last_valid_temperature = ERR_TEMP;					// Wert der letzten erfolgreichen Temperaturabfrage
-unsigned int l_last_valid_temperature_millis;	// Zeitwert der letzten erfolgreichen Temperaturabfrage
+int l_last_valid_temperature 		= ERR_TEMP;	// Wert der letzten erfolgreichen Temperaturabfrage
+int l_last_valid_temperature_hour 	= -1;		// Zeitwert der letzten erfolgreichen Temperaturabfrage, Stunde
+int l_last_valid_temperature_minute	= -1;		// Zeitwert der letzten erfolgreichen Temperaturabfrage, Minuten
+
+unsigned int ZeitDifferenzMinuten(int h1, int m1, int h2, int m2) {
+	time_t time1;
+	time_t time2;
+	
+	time1 = 60*m1 + 3600*h1;
+	time2 = 60*m2 + 3600*h2;
+	
+	if (h2<h1) {
+		time2 += 24*3600;
+	}
+	
+	return (unsigned int)(difftime(time2, time1) / 60);
+}
 
 //
 void showTemperature(int t, CRGB c) {
 
 	unsigned int jetzt;
-	
+	unsigned int letzte_gueltige_temperatur_vor_minuten;
 	
 	resetLEDs();
 
 	if (t == ERR_TEMP) {
 		// die Temperatur konnte nicht ermittelt werden
 
-		jetzt = millis();
+		letzte_gueltige_temperatur_vor_minuten = ZeitDifferenzMinuten(l_last_valid_temperature_minute, l_last_valid_temperature_hour, g_minute, g_hour);
 		
 		if	(	l_last_valid_temperature == ERR_TEMP 
-			|| (jetzt - l_last_valid_temperature_millis > ERR_TEMP_TOLERANCE_MINUTES*60*1000) 
-			|| (jetzt < l_last_valid_temperature_millis)
+			|| ( letzte_gueltige_temperatur_vor_minuten > 15) 
 			) {
 			// und es ist keine gueltige vorherige Temperatur bekannt
 			// oder die ist aelter als ERR_TEMP_TOLERANCE_MINUTES Minuten
@@ -45,6 +59,7 @@ void showTemperature(int t, CRGB c) {
 		}
 		else {
 			setWord(W_VIER_PUNKTE, CRGB::Red);
+			// vor weniger als 15 Minuten war die letzte gültige Zeitermittlung, also ersatzweise die letzte gueltige Temperatur hernehmen
 			t = l_last_valid_temperature;
 		}
 	}
@@ -247,8 +262,9 @@ int GetTemperature(String city) {
 	
 	if (temperature != ERR_TEMP) {
 		// es gibt eine gültige Temperatur
-		l_last_valid_temperature = temperature;
-		l_last_valid_temperature_millis = millis();
+		l_last_valid_temperature		= temperature;
+		l_last_valid_temperature_minute	= g_minute;
+		l_last_valid_temperature_hour	= g_hour;
 		errorstring = errorstring + "\n" + String(temperature) + String("&deg;C");
 	}
 	

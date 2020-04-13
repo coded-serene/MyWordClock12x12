@@ -7,6 +7,17 @@ extern CRGB leds[NUM_LEDS];
 extern config_t CONFIG;
 extern String ip;
 
+extern int g_hour;
+extern int g_minute;
+extern int g_heute_tag;
+extern int g_heute_monat;
+extern int g_heute_jahr;
+
+extern int g_reboot_hour;
+extern int g_reboot_minute;
+extern int g_reboot_heute_tag;
+extern int g_reboot_heute_monat;
+extern int g_reboot_heute_jahr;
 
 extern void setBrightness(int);
 extern void resetLEDs();

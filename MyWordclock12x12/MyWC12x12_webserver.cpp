@@ -339,6 +339,10 @@ void handleRootPath() {
 
   content += "<h1 align=center>WordClock Konfiguration</h1>";
   content += "<form class=\"form\" method=\"post\" action=\"\">";
+
+  content += "<div>";
+  content += "<p>Es ist jetzt " + String(g_hour) + ":" + String(g_minute) + "Uhr am " + String(g_heute_tag) + "." + String(g_heute_monat) + "." + String(g_heute_jahr) + "</p";
+  content += "<div>";
   
   content += "<div>";
   content += getTimeForm();
@@ -350,6 +354,10 @@ void handleRootPath() {
   
   
   content += "<hr label=\"Zurücksetzen\">";
+  
+  content += "<div>";
+  content += "<p>Letzter Neustart " + String(g_reboot_hour) + ":" + String(g_reboot_minute) + "Uhr am " + String(g_reboot_heute_tag) + "." + String(g_reboot_heute_monat) + "." + String(g_reboot_heute_jahr) + "</p";
+  content += "<div>";
   
   content += "<div>";
   content += "<button name=\"submit\" type=\"submit\" class=\"danger\" value=\"ResetConfig\" background-color=\"red\";>Konfiguration zur&uuml;cksetzen</button>";
