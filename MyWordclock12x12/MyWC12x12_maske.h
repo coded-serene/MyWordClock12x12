@@ -69,6 +69,21 @@ int words_umschaltung_schwellwert = L_S_DEUTSCHLAND;
 // Abbildung der Buchstabenmaske
 // Welche LED ist für welches Wort zu aktivieren?
 //
+// E S * I S T G F Ü N F W
+// Z E H N T Z W A N Z I G
+// M D R E I V I E R T E L
+// V O R N A C H K H A L B
+// P L U S & X M I N U S A
+// V I E R A C H T F Ü N F
+// S E C H S I E B E N O N
+// E I N S D R E I Z W E I
+// N E U N Z E H N E L F K
+// U N D J D R E I S S I G
+// Z W A N Z I G Z W Ö L F
+// N U L L V G R A D U H R
+//
+// * Ist das Herzsymbol
+//
 // Ergibt sich aus dem Layout der Maske. Jedes Wort wird mit -1 terminiert. Da pro Wort 13 ints vorgesehen werden, kann in einer 12x12-Matrix eine ganze Zeile mit einem Wort angeschaltet werden.
 //
 int words[W_ARRAYGROESSE][13] = {                				 // reicht für eine Zeile plus -1 als terminierender Wert
