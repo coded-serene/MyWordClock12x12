@@ -64,7 +64,6 @@ int wordsindex_ziffern[] = {W_NULL, W_EIN, W_ZWEI, W_DREI, W_VIER, W_FUENF, W_SE
 // Kann in uterschiedliche Lokalisierungen unterschiedlich ausfallen
 int words_umschaltung_schwellwert = L_S_DEUTSCHLAND;
 
-
 //
 // Abbildung der Buchstabenmaske
 // Welche LED ist für welches Wort zu aktivieren?
