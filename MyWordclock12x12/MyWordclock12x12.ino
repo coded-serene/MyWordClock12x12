@@ -31,13 +31,8 @@
 
 #include "MyWC12x12_config.h"
 
-#include <ESP8266WiFi.h>
-//#include <ESP8266WebServer.h>
-#include <ESP8266HTTPClient.h>
-#include <WiFiUdp.h>
 #include <WiFiManager.h>        // https://github.com/tzapu/WiFiManager
 #include <FastLED.h>            // http://fastled.io      https://github.com/FastLED/FastLED
-#include <DNSServer.h>
 #include <NTPClient.h>          // The MIT License (MIT) Copyright (c) 2015 by Fabrice Weinberg
 #include <FS.h>
 #include <ArduinoJson.h>        // arduinojson.org
@@ -998,7 +993,7 @@ void loop() {
 				temperatur_minute = g_minute;			// zu dieser Minute die Temperaturanzeige nicht mehr starten
 				temperatur_millis = millis();		// zur Realisierung einer Anzeigedauer diese Startzeit der Anzeige merken
 
-				showTemperature(mywc_g_temperature, GetTemperatureColor(mywc_g_temperature));
+				showTemperature(mywc_g_temperature);
 				// Temperaturanzeige wird in mode_temperatur beendet
 			}
 			else {

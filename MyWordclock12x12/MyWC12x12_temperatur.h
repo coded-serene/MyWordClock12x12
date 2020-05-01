@@ -17,16 +17,14 @@
 #ifdef TEMPERATUR_CPP
 
 #else
+
 extern int mywc_g_temperature;
 extern String mywc_g_temperature_real_location;
 
 extern void testTemperatur();
 
-extern CRGB GetTemperatureColor(int t);
-
-extern String GetTemperatureRealLocation(String s);
 extern int GetTemperature(String s);
-extern void showTemperature(int t, CRGB c);
+extern void showTemperature(int t);
 
 #endif
 

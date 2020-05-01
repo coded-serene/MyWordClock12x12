@@ -5,7 +5,7 @@
 
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
-#include <FastLED.h>            // http://fastled.io      https://github.com/FastLED/FastLED
+#include <FastLED.h>                            // http://fastled.io      https://github.com/FastLED/FastLED
 
 #include "MyWC12x12_temperatur.h"
 #include "MyWC12x12_maske.h"
@@ -30,71 +30,11 @@ unsigned int ZeitDifferenzMinuten(int h1, int m1, int h2, int m2) {
   time1 = 60*m1 + 3600*h1;
   time2 = 60*m2 + 3600*h2;
 
-  if (h2<h1) {
+  if (time2 < time1) {
     time2 += 24*3600;
   }
 
-  return (unsigned int)(difftime(time2, time1) / 60);
-}
-
-//
-void showTemperature(int t, CRGB c) {
-
-  unsigned int jetzt;
-  unsigned int dauer;		// Zeitspanne in millis, seitdem keine Zeit mehr ermittelt wurde
-  unsigned int anz_leds;
-  unsigned int letzte_gueltige_temperatur_vor_minuten;
-
-
-  resetLEDs();
-
-  if (t == ERR_TEMP) {
-    // die Temperatur konnte nicht ermittelt werden
-
-    letzte_gueltige_temperatur_vor_minuten = ZeitDifferenzMinuten(l_last_valid_temperature_minute, l_last_valid_temperature_hour, g_minute, g_hour);
-
-    anz_leds = letzte_gueltige_temperatur_vor_minuten;	// pro Minute eine LED
-
-    if (anz_leds <= 0) {
-      anz_leds = 1;
-    }
-    else if (anz_leds>4) {
-      anz_leds = 4;
-    }
-
-    if	(	l_last_valid_temperature == ERR_TEMP
-        || ( letzte_gueltige_temperatur_vor_minuten > 15)
-        ) {
-      // und es ist keine gueltige vorherige Temperatur bekannt
-      // oder die ist aelter als ERR_TEMP_TOLERANCE_MINUTES Minuten
-      setWord(W_GRAD, CRGB::Red);
-    }
-    else {
-      setWord(wordsindex_single_m[anz_leds], CRGB::Red);
-      t = l_last_valid_temperature;
-    }
-  }
-
-  if (t != ERR_TEMP) {
-    // es ist eine gültige Temperatur ermittelt worden, oder die temperatur ist auf die letzte Gültige gesetzt worden
-    if (t < -39 ) {
-      // die aber nicht angezeigt werden kann (zu klein)
-      t=-39;
-      setWord(W_VIER_PUNKTE, CRGB::Yellow);
-    }
-
-    if (t > 39) {
-      // die aber nicht angezeigt werden kann (zu groß)
-      t= 39;
-      setWord(W_VIER_PUNKTE, CRGB::Yellow);
-    }
-
-    setWord(W_ES_IST, c);
-    setNumber(t, c);
-    setWord(W_GRAD, c);
-  }
-
-  FastLED.show();
+  return (unsigned int)((time2 - time1) / 60);
 }
 
 // Farbabstufung der Temperaturanzeige
@@ -134,6 +74,66 @@ CRGB GetTemperatureColor(int t) {
   else {
     return CRGB::White;
   }
+}
+
+//
+void showTemperature(int t) {
+
+    unsigned int anz_leds;
+    unsigned int letzte_gueltige_temperatur_vor_minuten;
+    CRGB c;
+
+    resetLEDs();
+
+    if (t == ERR_TEMP) {
+        // die Temperatur konnte nicht ermittelt werden
+
+        letzte_gueltige_temperatur_vor_minuten = ZeitDifferenzMinuten(l_last_valid_temperature_minute, l_last_valid_temperature_hour, g_minute, g_hour);
+
+        anz_leds = letzte_gueltige_temperatur_vor_minuten;	// pro Minute eine LED
+
+        if (anz_leds <= 0) {
+            anz_leds = 1;
+        }
+        else if (anz_leds>4) {
+            anz_leds = 4;
+        }
+
+        if	(	l_last_valid_temperature == ERR_TEMP
+            || ( letzte_gueltige_temperatur_vor_minuten > 30)
+        ) {
+            // und es ist keine gueltige vorherige Temperatur bekannt
+            // oder die ist aelter als ERR_TEMP_TOLERANCE_MINUTES Minuten
+            setWord(W_GRAD, CRGB::Red);
+        }
+        else {
+            setWord(wordsindex_single_m[anz_leds], CRGB::Red);
+            t = l_last_valid_temperature;
+        }
+    }
+
+    if (t != ERR_TEMP) {
+        // es ist eine gültige Temperatur ermittelt worden, oder die temperatur ist auf die letzte Gültige gesetzt worden
+        if (t < -39 ) {
+            // die aber nicht angezeigt werden kann (zu klein)
+            t=-39;
+            setWord(W_VIER_PUNKTE, CRGB::Yellow);
+        }
+
+        if (t > 39) {
+            // die aber nicht angezeigt werden kann (zu groß)
+            t= 39;
+            setWord(W_VIER_PUNKTE, CRGB::Yellow);
+        }
+
+        c = GetTemperatureColor(t);
+
+        setWord(W_ES_IST, c);
+        setNumber(t, c);
+        setWord(W_GRAD, c);
+    }
+
+    FastLED.show();
 }
 
 
@@ -235,67 +235,80 @@ String GetTemperatureRealLocation(String city) {
 // WETTER, Temperatur holen
 //
 int GetTemperature(String city) {
-  int httpCode;
-  int temperature;
-  HTTPClient http;            //Declare object of class HTTPClient
-  String weatherstring;
-  String payload;
-  String temp_temperature;
-  String errorstring;
+    int httpCode;
+    int temperature;
+    HTTPClient http;            //Declare object of class HTTPClient
+    String weatherstring;
+    String payload;
+    String temp_temperature;
+    String errorstring;
 
-  temperature = ERR_TEMP; // is a kind of error code!
-  errorstring = "";		// kein Fehlertext
+    temperature = ERR_TEMP;     // is a kind of error code!
+    errorstring = "";           // kein Fehlertext
 
-  if (WiFi.status() == WL_CONNECTED) {                    						//Check WiFi connection status
-    weatherstring = "http://wttr.in/" + city + "?format=\%t";    //Specify request destination
+    if (WiFi.status() == WL_CONNECTED) {                            //Check WiFi connection status
+        weatherstring = "http://wttr.in/" + city + "?format=\%t";   //Specify request destination
 
-    Serial.println(weatherstring);
+        Serial.println(weatherstring);
 
-    http.begin(weatherstring);
-    httpCode = http.GET();
+        http.begin(weatherstring);
+        httpCode = http.GET();
 
-    if (httpCode >= HTTP_CODE_OK) {
-      payload = http.getString();                  						//Get the response payload
+        /// HTTP client errors
+        // HTTPC_ERROR_CONNECTION_REFUSED  (-1)
+        // HTTPC_ERROR_SEND_HEADER_FAILED  (-2)
+        // HTTPC_ERROR_SEND_PAYLOAD_FAILED (-3)
+        // HTTPC_ERROR_NOT_CONNECTED       (-4)
+        // HTTPC_ERROR_CONNECTION_LOST     (-5)
+        // HTTPC_ERROR_NO_STREAM           (-6)
+        // HTTPC_ERROR_NO_HTTP_SERVER      (-7)
+        // HTTPC_ERROR_TOO_LESS_RAM        (-8)
+        // HTTPC_ERROR_ENCODING            (-9)
+        // HTTPC_ERROR_STREAM_WRITE        (-10)
+        // HTTPC_ERROR_READ_TIMEOUT        (-11)
 
-      temp_temperature = payload.substring(0, payload.length() - 4); 	//Format is "+x°C\n" wobei ° zwei Bytes einnimmt!
+        if (httpCode >= HTTP_CODE_OK) {
+            payload = http.getString();                  						//Get the response payload
 
-      if ((temp_temperature.charAt(0) == '-') || (temp_temperature.charAt(0) == '+')) {
-        temperature = temp_temperature.toInt();
-      }
+            temp_temperature = payload.substring(0, payload.length() - 4); 	//Format is "+x°C\n" wobei ° zwei Bytes einnimmt!
+
+            if ((temp_temperature.charAt(0) == '-') || (temp_temperature.charAt(0) == '+')) {
+
+                temperature = temp_temperature.toInt();
+
+                // es gibt eine gültige Temperatur
+                l_last_valid_temperature        = temperature;
+                l_last_valid_temperature_minute = g_minute;
+                l_last_valid_temperature_hour   = g_hour;
+                errorstring = errorstring + "<br>\n" + GetDatumZeitString() + String(" ") + String(temperature) + String("&deg;C");
+
+                Serial.println(temperature);
+            }
+        }
+        else {
+            Serial.print  ("ERROR getting TEMPERATURE: httpCode=");   Serial.println(httpCode);
+            errorstring = GetDatumZeitString() + String(" Fehler bei der Temperaturabfrage: Anfragefehler " + String(httpCode));
+        }
+
+        http.end();                                           						//Close connection
     }
     else {
-      Serial.print  ("ERROR getting TEMPERATURE: httpCode=");   Serial.println(httpCode);
-      errorstring = GetDatumZeitString() + String(" Fehler bei der Temperaturabfrage: Anfragefehler " + String(httpCode));
+        errorstring = GetDatumZeitString() + String(" Keine WLAN-Verbindung");
     }
-    http.end();                                           						//Close connection
-  }
-  else {
-    errorstring = GetDatumZeitString() + String(" Keine WLAN-Verbindung");
-  }
 
-  if (temperature != ERR_TEMP) {
-    // es gibt eine gültige Temperatur
-    l_last_valid_temperature		    = temperature;
-    l_last_valid_temperature_minute	= g_minute;
-    l_last_valid_temperature_hour	  = g_hour;
-    errorstring = errorstring + "<br>\n" + GetDatumZeitString() + String(" ") + String(temperature) + String("&deg;C");
-  }
+    mywc_g_temperature_real_location = GetTemperatureRealLocation(city);
 
-  Serial.println(temperature);
+    if (errorstring != "") {
+        mywc_g_temperature_real_location = mywc_g_temperature_real_location+ String("<br>") + errorstring;
+    }
 
-  mywc_g_temperature_real_location = GetTemperatureRealLocation(city);
-
-  if (errorstring != "") {
-    mywc_g_temperature_real_location = mywc_g_temperature_real_location+ String("<br>") + errorstring;
-  }
-
-  return temperature;
+    return temperature;
 }
 
 void testTemperatur() {
   for (int i=-39; i<40; i++) {
-  showTemperature(i, GetTemperatureColor(i));
-  delay(500);
+      showTemperature(i);
+      delay(500);
   }
 }
 #endif

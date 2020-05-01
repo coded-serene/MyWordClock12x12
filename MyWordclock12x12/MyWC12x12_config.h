@@ -22,6 +22,7 @@
 #include <FastLED.h>            	// http://fastled.io      https://github.com/FastLED/FastLED
 
 #define LEDCOLORORDER RGB			// Je nach LED-Stripe kann RGB oder GRB (oder vllt. auch ein total anderer Typ auszuwählen sein
+// #define LEDCOLORORDER GRB
 
 #define DATA_PIN 4
 
