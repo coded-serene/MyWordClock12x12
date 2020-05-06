@@ -30,11 +30,11 @@ String rgbToHex(const CRGB hex) {
   return out;
 }
 
-String dat2String(int dat) {
-    if (dat <= 100) {
+String dat2String(int value) {
+    if (value <= 100) {
         return String(" ");
     }
-    elseif (value < 1000) {
+    else if (value < 1000) {
       return "0" + String(value);
     }
     else
@@ -136,11 +136,11 @@ String getTimeForm() {
   content += "<hr label=\"Dunkelschaltung\">";
   content += "<div>";
   content += "<label>Nachtmodus</label>";
-  content += "<input type=\"checkbox\" name=\"dunkelschaltung_active\" value=\"1\"";
-  if (CONFIG.dunkelschaltung_active) {
-    content += "checked";
-  };
-  content += ">";
+  // content += "<input type=\"checkbox\" name=\"dunkelschaltung_active\" value=\"1\"";
+  // if (CONFIG.dunkelschaltung_active) {
+  //   content += "checked";
+  // };
+  // content += ">";
   content += "</div>";
 
   // abgesenkte Helligkeit
@@ -153,6 +153,8 @@ String getTimeForm() {
   content += "<label>Nachtmodus Startzeit</label>";
   content += "<select class=\"time\" name=\"dunkelschaltung_start\">";
 
+  content += htmlOption("Aus", String(-1), String(CONFIG.dunkelschaltung_start));
+
   for (int i = 0; i < 24; i++) {
     content += htmlOption(pad(i) + ":00", String(i * 100), String(CONFIG.dunkelschaltung_start));
     content += htmlOption(pad(i) + ":30", String(i * 100 + 30), String(CONFIG.dunkelschaltung_start));
@@ -164,6 +166,8 @@ String getTimeForm() {
   content += "<div>";
   content += "<label>Nachtmodus Endzeit</label>";
   content += "<select class=\"time\" name=\"dunkelschaltung_end\">";
+
+  content += htmlOption("Aus", String(-1), String(CONFIG.dunkelschaltung_end));
 
   for (int i = 0; i < 24; i++) {
     content += htmlOption(pad(i) + ":00", String(i * 100), String(CONFIG.dunkelschaltung_end));
@@ -283,9 +287,10 @@ void change() {
 
 			if (server.hasArg("tz")) 							CONFIG.timezone 					= server.arg("tz").toInt();
 
-			if (server.hasArg("dunkelschaltung_active"))		CONFIG.dunkelschaltung_active 		= server.arg("dunkelschaltung_active").toInt();
+			// if (server.hasArg("dunkelschaltung_active"))		CONFIG.dunkelschaltung_active 		= server.arg("dunkelschaltung_active").toInt();
 			if (server.hasArg("dunkelschaltung_start")) 		CONFIG.dunkelschaltung_start 		= server.arg("dunkelschaltung_start").toInt();
 			if (server.hasArg("dunkelschaltung_end")) 			CONFIG.dunkelschaltung_end 			= server.arg("dunkelschaltung_end").toInt();
+                                                                CONFIG.dunkelschaltung_active       = (CONFIG.dunkelschaltung_start>=0 && CONFIG.dunkelschaltung_end>=0);
 			if (server.hasArg("dunkelschaltung_brightness"))	CONFIG.dunkelschaltung_brightness	= server.arg("dunkelschaltung_brightness").toInt();
 
 			if (server.hasArg("locale")) 						CONFIG.locale 						= server.arg("locale").toInt();
@@ -336,15 +341,15 @@ void handleRootPath() {
   content += "html, body { font-family: Helvetica; margin: 0; padding: 0; }\n";
   content += ".form { margin: auto; max-width: 400px; }\n";
   content += ".form div { margin-top: 10; width: 100%; }\n";
-  content += "label { width: 60%; display: inline-block; margin: 0; vertical-align: middle; }";
-  content += "input, select { width: 38%; display: inline-block; margin: 0; border: 1px solid #eee; padding: 0; height: 40px; vertical-align: right; }";
-  content += "select.time { width: 18%; }";
-  content += "button { display: inline-block; width: 100%; font-size: 1.4rem; background-color: green; border: 1px solid #eee; color: #fff; padding-top: 10px; padding-bottom: 10px; }";
-  content += "button.danger {  background-color: red;  }";
-  content += "button.test {  background-color: yellow; }";
-  content += "</style>";
-  content += "</head>";
-  content += "<body>";
+  content += "label { width: 60%; display: inline-block; margin: 0; vertical-align: middle; }\n";
+  content += "input, select { width: 38%; display: inline-block; margin: 0; border: 1px solid #eee; padding: 0; height: 40px; vertical-align: middle; }\n";
+  content += "select.time { width: 18%; }\n";
+  content += "button { display: inline-block; width: 100%; font-size: 1.4rem; background-color: green; border: 1px solid #eee; color: #fff; padding-top: 10px; padding-bottom: 10px; }\n";
+  content += "button.danger {  background-color: red;  }\n";
+  content += "button.test {  background-color: yellow; }\n";
+  content += "</style>\n";
+  content += "</head>\n";
+  content += "<body>\n";
 
 
 
