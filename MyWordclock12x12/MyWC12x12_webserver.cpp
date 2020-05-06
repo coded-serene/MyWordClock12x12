@@ -30,6 +30,17 @@ String rgbToHex(const CRGB hex) {
   return out;
 }
 
+String dat2String(int dat) {
+    if (dat <= 100) {
+        return String(" ");
+    }
+    elseif (value < 1000) {
+      return "0" + String(value);
+    }
+    else
+        return String(value);
+}
+
 //
 // Funktionen rund um die Konfigurationsseite des eigenen Webservers
 //
@@ -78,7 +89,7 @@ String getTimeForm() {
   content += "</div>";
 
   content += "<hr>";
-  
+
   // Zeitzone
   content += "<div>";
   content += "<label>Zeitzone</label>";
@@ -98,7 +109,7 @@ String getTimeForm() {
 
 
   content += "<hr>";
-  
+
   content += "<div>";
   content += "<label>Region</label>";
   content += "<select name=\"locale\">";
@@ -108,7 +119,7 @@ String getTimeForm() {
   content += "</div>";
 
   content += "<hr>";
-  
+
   content += "<div>";
   content += "<label>Herz</label>";
   content += "<select class=\"time\" name=\"herz\" onchange=\"herzchanged\">";
@@ -119,7 +130,7 @@ String getTimeForm() {
   content += htmlOption("Standardfarbe + Rot am Datum", String(HERZ_STD_DATUM), String(CONFIG.herz));
   content += "</select>";
   content += "<label>Datum (TTMM)</label>";
-  content += "<input name=\"dat_herz\" value=\"" + ((CONFIG.dat_herz>0)?String(CONFIG.dat_herz):String(" ")) + "\" maxlength=\"4\">";
+  content += "<input name=\"dat_herz\" value=\"" + dat2String(CONFIG.dat_herz) + "\" maxlength=\"4\">";
   content += "</div>";
 
   content += "<hr label=\"Dunkelschaltung\">";
@@ -165,10 +176,10 @@ String getTimeForm() {
 
 #ifdef TEMPERATURE
   content += "<hr>";
-  
+
   content += "<div>";
   content += "<label>Temperaturanzeige</label>";
-  
+
   content += "<select class=\"time\" name=\"temp_active\">";
   content += htmlOption("Aus", 				String(0), String(CONFIG.temp_active));
   content += htmlOption("Jede Minute", 		String(1), String(CONFIG.temp_active));
@@ -185,40 +196,40 @@ String getTimeForm() {
 
 #ifdef GEBURTSTAGE
   content += "<hr>";
-  
+
   content += "<div>";
   content += "<label>Name</label>";
   content += "<input name=\"geb_name_1\" value=\"" + String(CONFIG.geb_name_1) + "\" maxlength=\"24\">";
   content += "<label>Geburtstag (TTMM)</label>";
-  content += "<input name=\"geb_1\" value=\"" + ((CONFIG.geb_1>0)?String(CONFIG.geb_1):String(" ")) + "\" maxlength=\"4\">";
+  content += "<input name=\"geb_1\" value=\"" + dat2String(CONFIG.geb_1) + "\" maxlength=\"4\">";
   content += "</div>";
 
   content += "<div>";
   content += "<label>Name</label>";
   content += "<input name=\"geb_name_2\" value=\"" + String(CONFIG.geb_name_2) + "\" maxlength=\"24\">";
   content += "<label>Geburtstag (TTMM)</label>";
-  content += "<input name=\"geb_2\" value=\"" + ((CONFIG.geb_2>0)?String(CONFIG.geb_2):String(" ")) + "\" maxlength=\"4\">";
+  content += "<input name=\"geb_2\" value=\"" + dat2String(CONFIG.geb_2) + "\" maxlength=\"4\">";
   content += "</div>";
 
   content += "<div>";
   content += "<label>Name</label>";
   content += "<input name=\"geb_name_3\" value=\"" + String(CONFIG.geb_name_3) + "\" maxlength=\"24\">";
   content += "<label>Geburtstag (TTMM)</label>";
-  content += "<input name=\"geb_3\" value=\"" + ((CONFIG.geb_3>0)?String(CONFIG.geb_3):String(" ")) + "\" maxlength=\"4\">";
+  content += "<input name=\"geb_3\" value=\"" + dat2String(CONFIG.geb_3) + "\" maxlength=\"4\">";
   content += "</div>";
 
   content += "<div>";
   content += "<label>Name</label>";
   content += "<input name=\"geb_name_4\" value=\"" + String(CONFIG.geb_name_4) + "\" maxlength=\"24\">";
   content += "<label>Geburtstag (TTMM)</label>";
-  content += "<input name=\"geb_4\" value=\"" + ((CONFIG.geb_4>0)?String(CONFIG.geb_4):String(" ")) + "\" maxlength=\"4\">";
+  content += "<input name=\"geb_4\" value=\"" + dat2String(CONFIG.geb_4) + "\" maxlength=\"4\">";
   content += "</div>";
 
   content += "<div>";
   content += "<label>Name</label>";
   content += "<input name=\"geb_name_5\" value=\"" + String(CONFIG.geb_name_5) + "\" maxlength=\"24\">";
   content += "<label>Geburtstag (TTMM)</label>";
-  content += "<input name=\"geb_5\" value=\"" + ((CONFIG.geb_5>0)?String(CONFIG.geb_5):String(" ")) + "\" maxlength=\"4\">";
+  content += "<input name=\"geb_5\" value=\"" + dat2String(CONFIG.geb_5) + "\" maxlength=\"4\">";
   content += "</div>";
 #endif
 
@@ -230,7 +241,7 @@ String getTimeForm() {
 //
 void change() {
 
-	/* 
+	/*
 	for (int i = 0; i < server.args(); i++)
 	{
 		Serial.println(server.argName(i) + " = " + server.arg(i));
@@ -272,7 +283,7 @@ void change() {
 
 			if (server.hasArg("tz")) 							CONFIG.timezone 					= server.arg("tz").toInt();
 
-			if (server.hasArg("dunkelschaltung_active"))		CONFIG.dunkelschaltung_active 		= server.arg("dunkelschaltung_active");
+			if (server.hasArg("dunkelschaltung_active"))		CONFIG.dunkelschaltung_active 		= server.arg("dunkelschaltung_active").toInt();
 			if (server.hasArg("dunkelschaltung_start")) 		CONFIG.dunkelschaltung_start 		= server.arg("dunkelschaltung_start").toInt();
 			if (server.hasArg("dunkelschaltung_end")) 			CONFIG.dunkelschaltung_end 			= server.arg("dunkelschaltung_end").toInt();
 			if (server.hasArg("dunkelschaltung_brightness"))	CONFIG.dunkelschaltung_brightness	= server.arg("dunkelschaltung_brightness").toInt();
@@ -303,10 +314,10 @@ void change() {
 			//
 			// Änderungen durchsetzen
 			//
-			
+
 			// Speichern
 			saveConfig();
-			
+
 			// Werte für die Anzeige aktualisieren und neu starten
 			restart();
 		}
@@ -343,7 +354,7 @@ void handleRootPath() {
   content += "<div>";
   content += "<p>Es ist jetzt " + String(g_hour) + ":" + String(g_minute) + "Uhr am " + String(g_heute_tag) + "." + String(g_heute_monat) + "." + String(g_heute_jahr) + "</p";
   content += "<div>";
-  
+
   content += "<div>";
   content += getTimeForm();
   content += "</div>";
@@ -351,14 +362,14 @@ void handleRootPath() {
   content += "<div>";
   content += "<button name=\"submit\" type=\"submit\" value=\"save\">Speichern</button>";
   content += "</div>";
-  
-  
+
+
   content += "<hr label=\"Zurücksetzen\">";
-  
+
   content += "<div>";
   content += "<p>Letzter Neustart " + String(g_reboot_hour) + ":" + String(g_reboot_minute) + "Uhr am " + String(g_reboot_heute_tag) + "." + String(g_reboot_heute_monat) + "." + String(g_reboot_heute_jahr) + "</p";
   content += "<div>";
-  
+
   content += "<div>";
   content += "<button name=\"submit\" type=\"submit\" class=\"danger\" value=\"ResetConfig\" background-color=\"red\";>Konfiguration zur&uuml;cksetzen</button>";
   content += "</div>";
@@ -370,7 +381,7 @@ void handleRootPath() {
   content += "</div>";
 
   content += "<hr label=\"Tests\">";
-  
+
   content += "<div>";
   content += "<button name=\"submit\" type=\"submit\" class=\"test\" value=\"testLocale\">Test Region</button>";
   content += "</div>";
@@ -383,7 +394,7 @@ void handleRootPath() {
   content += "<div>";
   content += "<button name=\"submit\" type=\"submit\" class=\"test\" value=\"testPower\">Test Stromverbrauch</button>";
   content += "</div>";
-  
+
   content += "</form>";
   content += "</body></html>";
 
