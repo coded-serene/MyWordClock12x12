@@ -35,7 +35,9 @@
 #define NUM_LEDS (GRID_ROWS * GRID_COLS) + 4
 
 #define CONFIGFILE "/wordclock_config.json"
-#define MODE_TIME 0
+
+#define MODE_TIME_FIRST 5
+#define MODE_TIME       6
 
 typedef struct {
   CRGB color_bg;

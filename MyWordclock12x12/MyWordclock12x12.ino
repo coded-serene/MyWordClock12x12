@@ -72,42 +72,38 @@ CRGB leds[NUM_LEDS];
 config_t CONFIG;
 String ip;
 
-int g_hour		= -1;
-int g_minute	= -1;
-int g_heute_tag 	= -1;
-int g_heute_monat	= -1;
-int g_heute_jahr	= -1;
+int g_hour                      = -1;
+int g_minute                    = -1;
+int g_heute_tag                 = -1;
+int g_heute_monat               = -1;
+int g_heute_jahr                = -1;
 
-int g_reboot_hour			= -1;
-int g_reboot_minute			= -1;
-int g_reboot_heute_tag 		= -1;
-int g_reboot_heute_monat	= -1;
-int g_reboot_heute_jahr		= -1;
+int g_reboot_hour			    = -1;
+int g_reboot_minute			    = -1;
+int g_reboot_heute_tag 		    = -1;
+int g_reboot_heute_monat	    = -1;
+int g_reboot_heute_jahr		    = -1;
 
 //
 // lokale Modulvariable
 //
-int hour 		= -1;
-int minute 		= -1;
+int hour                        = -1;
+int minute                      = -1;
 
-
-static int myMode;			// aktueller Anzeigemodus für den Zustandsautomaten
+static int myMode;			                         // aktueller Anzeigemodus für den Zustandsautomaten
 static bool mode_change;
 
 #ifdef TEMPERATURE
-int temperatur_minute = -1;				// Minute, zu der zum letzten Mal die Temperatur angezeigt wurde
+int getTemperature_minute       = -1;				// Minute, zu der zum letzten Mal die Temperatur angezeigt wurde
 unsigned long temperatur_millis = -1;
 #endif
+
 #ifdef GEBURTSTAGE
-int geburtstag_minute = -1;				// Minute, zu der zum letzten Mal die Geburtstagslaufschrift angezeigt wurde
+int geburtstag_minute           = -1;				// Minute, zu der zum letzten Mal die Geburtstagslaufschrift angezeigt wurde
 unsigned long geburtstag_millis = -1;
-int geburtstag_ende = 0;
+int geburtstag_ende             = 0;
 #endif
 
-//
-// Zeitermittlung
-//WiFiUDP ntpUDP;
-//NTPClient timeClient(ntpUDP, "pool.ntp.org", 3600, 3600000);
 //
 // Wifi-Manager für die Netzverbindung
 WiFiManager wifiManager;
@@ -117,30 +113,28 @@ WiFiManager wifiManager;
 //
 //
 //
-
-
 void changeLocale() {
 
-  Serial.println("Locale=" + CONFIG.locale);
+    Serial.println("Locale=" + CONFIG.locale);
 
-  if (CONFIG.locale == L_FRANKEN) {
-    Serial.println(L_W_FRANKEN);
+    if (CONFIG.locale == L_FRANKEN) {
+        Serial.println(L_W_FRANKEN);
 
-	words_umschaltung_schwellwert = L_S_FRANKEN;
-    wordsindex_minutes[3] = W_VIERTEL;
-    wordsindex_minutes[4] = W_ZEHN_VOR_HALB;
-    wordsindex_minutes[8] = W_ZEHN_NACH_HALB;
-    wordsindex_minutes[9] = W_DREIVIERTEL;
-  }
-  else {
-    Serial.println(L_W_DEUTSCHLAND);
+        words_umschaltung_schwellwert = L_S_FRANKEN;
+        wordsindex_minutes[3] = W_VIERTEL;
+        wordsindex_minutes[4] = W_ZEHN_VOR_HALB;
+        wordsindex_minutes[8] = W_ZEHN_NACH_HALB;
+        wordsindex_minutes[9] = W_DREIVIERTEL;
+    }
+    else {
+        Serial.println(L_W_DEUTSCHLAND);
 
-    words_umschaltung_schwellwert = L_S_DEUTSCHLAND;
-    wordsindex_minutes[3] = W_VIERTEL_NACH;
-    wordsindex_minutes[4] = W_ZWANZIG_NACH;
-    wordsindex_minutes[8] = W_ZWANZIG_VOR;
-    wordsindex_minutes[9] = W_VIERTEL_VOR;
-  }
+        words_umschaltung_schwellwert = L_S_DEUTSCHLAND;
+        wordsindex_minutes[3] = W_VIERTEL_NACH;
+        wordsindex_minutes[4] = W_ZWANZIG_NACH;
+        wordsindex_minutes[8] = W_ZWANZIG_VOR;
+        wordsindex_minutes[9] = W_VIERTEL_VOR;
+    }
 }
 
 
@@ -149,111 +143,112 @@ void changeLocale() {
 //
 
 void defaultConfig() {
-  // Falbackwerte
-  CONFIG.color_bg 					= CRGB::Black;
-  CONFIG.color_fg 					= CRGB::White;
-  CONFIG.brightness 				= BRIGHTNESS_DEFAULT; // %
+    // Falbackwerte
+    CONFIG.color_bg                     = CRGB::Black;
+    CONFIG.color_fg 					= CRGB::White;
+    CONFIG.brightness                   = BRIGHTNESS_DEFAULT; // %
 
-  CONFIG.timezone 					= 1;
+    CONFIG.timezone 					= 1;
 
-  // Fallback: Dunkelschaltung inaktiv
-  CONFIG.dunkelschaltung_active 	= false;
-  CONFIG.dunkelschaltung_brightness	= 5; // %
-  CONFIG.dunkelschaltung_start 		= 2200;
-  CONFIG.dunkelschaltung_end 		= 600;
+    // Fallback: Dunkelschaltung inaktiv
+    CONFIG.dunkelschaltung_active       = true;
+    CONFIG.dunkelschaltung_brightness   = 5; // %
+    CONFIG.dunkelschaltung_start 		= 2200;
+    CONFIG.dunkelschaltung_end          = 600;
 
 #ifdef TEMPERATURE
-  // Temperaturanzeige zu jeder Minute
-  CONFIG.temp_active 				= TEMPERATURE_MINUTE;
-  CONFIG.city 						= "Erlangen";
+    // Temperaturanzeige zu jeder Minute
+    CONFIG.temp_active                  = TEMPERATURE_MINUTE;
+    CONFIG.city                         = "Erlangen";
 #endif
 
-  // allg. deutsche Sprache
-  CONFIG.locale 					= L_DEUTSCHLAND;
+    // allg. deutsche Sprache
+    CONFIG.locale                       = L_DEUTSCHLAND;
 
 #ifdef GEBURTSTAGE
-  CONFIG.geb_1 = -1;
-  CONFIG.geb_2 = -1;
-  CONFIG.geb_3 = -1;
-  CONFIG.geb_4 = -1;
-  CONFIG.geb_5 = -1;
-  CONFIG.geb_name_1 = "";
-  CONFIG.geb_name_2 = "";
-  CONFIG.geb_name_3 = "";
-  CONFIG.geb_name_4 = "";
-  CONFIG.geb_name_5 = "";
+    CONFIG.geb_1                        = -1;
+    CONFIG.geb_2                        = -1;
+    CONFIG.geb_3                        = -1;
+    CONFIG.geb_4                        = -1;
+    CONFIG.geb_5                        = -1;
+    CONFIG.geb_name_1                   = "";
+    CONFIG.geb_name_2                   = "";
+    CONFIG.geb_name_3                   = "";
+    CONFIG.geb_name_4                   = "";
+    CONFIG.geb_name_5                   = "";
 #endif
 
-  CONFIG.herz 						= HERZ_ROT;
-  CONFIG.dat_herz 					= -1;
+    CONFIG.herz 						= HERZ_ROT;
+    CONFIG.dat_herz 					= -1;
 }
+
 
 void loadConfig() {
 
-  defaultConfig();
+    defaultConfig();
 
-  File file = SPIFFS.open(CONFIGFILE, "r");
+    File file = SPIFFS.open(CONFIGFILE, "r");
 
-  if (!file) {
-    Serial.println("Failed to open config file.");
-    saveConfig();
-    return;
-  }
+    if (!file) {
+        Serial.println("Failed to open config file.");
+        saveConfig();
+        return;
+    }
 
-  Serial.println("Load config.");
+    Serial.println("Load config.");
 
-  StaticJsonDocument<1024> doc;
-  deserializeJson(doc, file);
+    StaticJsonDocument<1024> doc;
+    deserializeJson(doc, file);
 
-  Serial.println(doc.as<String>());
+    Serial.println(doc.as<String>());
 
-  CONFIG.color_bg.r 				= doc["color_bg_r"].as<int>();
-  CONFIG.color_bg.g 				= doc["color_bg_g"].as<int>();
-  CONFIG.color_bg.b 				= doc["color_bg_b"].as<int>();
+    CONFIG.color_bg.r 				    = doc["color_bg_r"].as<int>();
+    CONFIG.color_bg.g 				    = doc["color_bg_g"].as<int>();
+    CONFIG.color_bg.b 				    = doc["color_bg_b"].as<int>();
 
-  CONFIG.color_fg.r 				= doc["color_fg_r"].as<int>();
-  CONFIG.color_fg.g 				= doc["color_fg_g"].as<int>();
-  CONFIG.color_fg.b 				= doc["color_fg_b"].as<int>();
+    CONFIG.color_fg.r 				    = doc["color_fg_r"].as<int>();
+    CONFIG.color_fg.g 				    = doc["color_fg_g"].as<int>();
+    CONFIG.color_fg.b 				    = doc["color_fg_b"].as<int>();
 
-  CONFIG.brightness 				= doc["brightness"].as<int>();
+    CONFIG.brightness 				    = doc["brightness"].as<int>();
 
-  CONFIG.timezone 					= doc["timezone"].as<int>();
-  //timeClient.setTimeOffset(CONFIG.timezone * 3600);
-  configTime(3600 * CONFIG.timezone, 1 * 3600, "0.pool.ntp.org", "time.nist.gov", "1.pool.ntp.org");
+    CONFIG.timezone 					= doc["timezone"].as<int>();
+    //timeClient.setTimeOffset(CONFIG.timezone * 3600);
+    configTime(3600 * CONFIG.timezone, 1 * 3600, "0.pool.ntp.org", "time.nist.gov", "1.pool.ntp.org");
 
-  CONFIG.dunkelschaltung_active 	= doc["dunkelschaltung_active"].as<bool>();
-  CONFIG.dunkelschaltung_start 		= doc["dunkelschaltung_start"].as<int>();
-  CONFIG.dunkelschaltung_end 		= doc["dunkelschaltung_end"].as<int>();
-  CONFIG.dunkelschaltung_brightness	= doc["dunkelschaltung_brightness"].as<int>();
+    CONFIG.dunkelschaltung_active 	    = doc["dunkelschaltung_active"].as<bool>();
+    CONFIG.dunkelschaltung_start 		= doc["dunkelschaltung_start"].as<int>();
+    CONFIG.dunkelschaltung_end          = doc["dunkelschaltung_end"].as<int>();
+    CONFIG.dunkelschaltung_brightness   = doc["dunkelschaltung_brightness"].as<int>();
 
-  setBrightness(BRIGHTNESS_AUTO);
+    setBrightness(BRIGHTNESS_AUTO);
 
 #ifdef TEMPERATURE
-  CONFIG.temp_active 				= doc["temp_active"].as<int>();
-  CONFIG.city 						= doc["city"].as<char *>();
+    CONFIG.temp_active 				    = doc["temp_active"].as<int>();
+    CONFIG.city 						= doc["city"].as<char *>();
 #endif
 
-  CONFIG.locale 					= doc["locale"].as<int>();
-  // richtiges Sprachmodell auswaehlen
-  changeLocale();
+    CONFIG.locale 					    = doc["locale"].as<int>();
+    // richtiges Sprachmodell auswaehlen
+    changeLocale();
 
 #ifdef GEBURTSTAGE
-  CONFIG.geb_1 						= doc["geb_1"].as<int>();
-  CONFIG.geb_2 						= doc["geb_2"].as<int>();
-  CONFIG.geb_3 						= doc["geb_3"].as<int>();
-  CONFIG.geb_4 						= doc["geb_4"].as<int>();
-  CONFIG.geb_5 						= doc["geb_5"].as<int>();
-  CONFIG.geb_name_1 				= doc["geb_name_1"].as<char *>();
-  CONFIG.geb_name_2 				= doc["geb_name_2"].as<char *>();
-  CONFIG.geb_name_3 				= doc["geb_name_3"].as<char *>();
-  CONFIG.geb_name_4 				= doc["geb_name_4"].as<char *>();
-  CONFIG.geb_name_5 				= doc["geb_name_5"].as<char *>();
+    CONFIG.geb_1 						= doc["geb_1"].as<int>();
+    CONFIG.geb_2 						= doc["geb_2"].as<int>();
+    CONFIG.geb_3 						= doc["geb_3"].as<int>();
+    CONFIG.geb_4 						= doc["geb_4"].as<int>();
+    CONFIG.geb_5 						= doc["geb_5"].as<int>();
+    CONFIG.geb_name_1 				    = doc["geb_name_1"].as<char *>();
+    CONFIG.geb_name_2 				    = doc["geb_name_2"].as<char *>();
+    CONFIG.geb_name_3 				    = doc["geb_name_3"].as<char *>();
+    CONFIG.geb_name_4 				    = doc["geb_name_4"].as<char *>();
+    CONFIG.geb_name_5 				    = doc["geb_name_5"].as<char *>();
 #endif
 
-  CONFIG.herz 						= doc["herz"].as<int>();
-  CONFIG.dat_herz 					= doc["dat_herz"].as<int>();
+    CONFIG.herz 						= doc["herz"].as<int>();
+    CONFIG.dat_herz 					= doc["dat_herz"].as<int>();
 
-  file.close();
+    file.close();
 }
 
 
@@ -345,51 +340,51 @@ void testLocale() {
 // und die Dunkelschaltung aktiviert wurde
 //
 bool jetztDunkelschaltung(int hour, int minute) {
-  int jetzt;
+    int jetzt;
 
-  if (!CONFIG.dunkelschaltung_active || CONFIG.dunkelschaltung_start == -1 || CONFIG.dunkelschaltung_end == -1) {
+    if (!CONFIG.dunkelschaltung_active || CONFIG.dunkelschaltung_start == -1 || CONFIG.dunkelschaltung_end == -1) {
+        return false;
+    }
+
+    jetzt = 100 * hour + minute;
+
+    if (CONFIG.dunkelschaltung_start <= CONFIG.dunkelschaltung_end ) {
+        if (jetzt >= CONFIG.dunkelschaltung_start && jetzt <= CONFIG.dunkelschaltung_end) {
+            return true;
+        }
+    }
+    else {
+        if (jetzt >= CONFIG.dunkelschaltung_start || jetzt <= CONFIG.dunkelschaltung_end) {
+            return true;
+        }
+    }
+
     return false;
-  }
-
-  jetzt = 100 * hour + minute;
-
-  if (CONFIG.dunkelschaltung_start <= CONFIG.dunkelschaltung_end ) {
-    if (jetzt >= CONFIG.dunkelschaltung_start && jetzt <= CONFIG.dunkelschaltung_end) {
-      return true;
-    }
-  }
-  else {
-    if (jetzt >= CONFIG.dunkelschaltung_start || jetzt <= CONFIG.dunkelschaltung_end) {
-      return true;
-    }
-  }
-
-  return false;
 }
 
 //
 // Zeitfunktionen
 //
 bool getLocalTime(struct tm *info, uint32_t ms) {
-  uint32_t count = ms / 10;
-  time_t now;
+    uint32_t count = ms / 10;
+    time_t now;
 
-  time(&now);
-  localtime_r(&now, info);
-
-  if (info->tm_year > (2016 - 1900)) {
-    return true;
-  }
-
-  while (count--) {
-    delay(10);
     time(&now);
     localtime_r(&now, info);
+
     if (info->tm_year > (2016 - 1900)) {
-      return true;
+        return true;
     }
-  }
-  return false;
+
+    while (count--) {
+        delay(10);
+        time(&now);
+        localtime_r(&now, info);
+        if (info->tm_year > (2016 - 1900)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void GetTimeAndDate(int *stunden, int *minuten, int *tag, int *monat, int *jahr) {
@@ -405,15 +400,15 @@ void GetTimeAndDate(int *stunden, int *minuten, int *tag, int *monat, int *jahr)
 }
 
 String GetDatumZeitString() {
-  struct tm tmstruct;
-  char buffer[80];
+    struct tm tmstruct;
+    char buffer[80];
 
 
-  getLocalTime(&tmstruct, 5000);
+    getLocalTime(&tmstruct, 5000);
 
-  strftime(buffer, 80, "%d.%m.%Y %H:%M", &tmstruct);
+    strftime(buffer, 80, "%d.%m.%Y %H:%M", &tmstruct);
 
-  return String(buffer);
+    return String(buffer);
 }
 // Funktionen zum Arbeiten mit dem LED-Streifen
 //
@@ -533,14 +528,14 @@ void setNumber(int n, CRGB c = CRGB::White) {
 
 #ifdef LAUFSCHRIFT
 void startLaufschrift(String text, CRGB c = CRGB::White) {
-  text = "   " + text;      // smooth in
+    text = "   " + text;      // smooth in
 
-  text.toCharArray(buffer, 256);
+    text.toCharArray(buffer, 256);
 
-  resetLEDs();
+    resetLEDs();
 
-  ScrollingMsg.SetText((unsigned char *)buffer, strlen(buffer));
-  ScrollingMsg.SetTextColrOptions(COLR_RGB | COLR_SINGLE, c.r, c.g, c.b);
+    ScrollingMsg.SetText((unsigned char *)buffer, strlen(buffer));
+    ScrollingMsg.SetTextColrOptions(COLR_RGB | COLR_SINGLE, c.r, c.g, c.b);
 }
 
 int stepLaufschrift() {
@@ -556,24 +551,24 @@ int stepLaufschrift() {
 }
 
 void showLaufschrift(String text, CRGB c = CRGB::White) {
-  char buffer[256];
+    char buffer[256];
 
-  Serial.println("Laufschrift " + text);
+    Serial.println("Laufschrift " + text);
 
-  text = "   " + text;      // smooth in
+    text = "   " + text;      // smooth in
 
-  text.toCharArray(buffer, 256);
+    text.toCharArray(buffer, 256);
 
-  resetLEDs();
+    resetLEDs();
 
-  ScrollingMsg.SetText((unsigned char *)buffer, strlen(buffer));
-  ScrollingMsg.SetTextColrOptions(COLR_RGB | COLR_SINGLE, c.r, c.g, c.b);
+    ScrollingMsg.SetText((unsigned char *)buffer, strlen(buffer));
+    ScrollingMsg.SetTextColrOptions(COLR_RGB | COLR_SINGLE, c.r, c.g, c.b);
 
-  while (ScrollingMsg.UpdateText() != -1)
-  {
-	FastLED.show();
-    delay(LAUFSCHRIFT_SPEED);
-  }
+    while (ScrollingMsg.UpdateText() != -1)
+    {
+        FastLED.show();
+        delay(LAUFSCHRIFT_SPEED);
+    }
 }
 
 void testLaufschrift() {
@@ -876,28 +871,28 @@ void setup() {
 	Serial.println("OTA ready");
 #endif
 
+    g_heute_tag        = -1;
+    myMode             = MODE_TEMP;			// aktueller Anzeigemodus für den Zustandsautomaten
+    mode_change        = true;
+#ifdef TEMPERATURE
+    mywc_g_temperature = ERR_TEMP;
+#endif
+
 	// start webserver
 	startServer();
-
-	GetTimeAndDate(&g_reboot_hour, &g_reboot_minute, &g_reboot_heute_tag, &g_reboot_heute_monat, &g_reboot_heute_jahr);
-
 
 	// Configure time-service, mit Sommer/Winterzeit von einer Stunde
 	configTime(3600 * CONFIG.timezone, 1 * 3600, "0.pool.ntp.org", "time.nist.gov", "1.pool.ntp.org");
 
-	g_heute_tag = -1;
-	myMode = MODE_TEMP;			// aktueller Anzeigemodus für den Zustandsautomaten
-	mode_change = true;
-
-#ifdef TEMPERATURE
-	mywc_g_temperature = ERR_TEMP;
-#endif
+    // Holen der RebootZeit
+    GetTimeAndDate(&g_reboot_hour, &g_reboot_minute, &g_reboot_heute_tag, &g_reboot_heute_monat, &g_reboot_heute_jahr);
 }
 
 void loop() {
-//	int h;
-//	int m;
+
+#ifdef GEBURTSTAGE || TEMPERATURE
 	unsigned long jetzt;
+#endif
 
 	//
 	// Zeit aktualisieren
@@ -933,32 +928,31 @@ void loop() {
 	//
 	// im Idealfall wird die Temperatur nur alle 15 Minuten ermittelt
 	//
-	if	(	CONFIG.temp_active != TEMPERATURE_AUS 						// wenn überhaupt das Temperatur-Feature aktiviert ist
-		&& 	temperatur_minute  != g_minute  							// und zu dieser Minute noch keine Temperaturermittling stattgefunden hat
-		&& 	((g_minute % 15) == 0 || mywc_g_temperature == ERR_TEMP) 	// und entweder die Temperatur ermittelt werden soll (alle Viertelstunde) oder muss (keine aktuelle Temperatur)
+	if	(   CONFIG.temp_active != TEMPERATURE_AUS 						// wenn überhaupt das Temperatur-Feature aktiviert ist
+         && ((g_minute % 15) == 0 || mywc_g_temperature == ERR_TEMP) 	// und entweder die Temperatur ermittelt werden soll (alle Viertelstunde) oder muss (keine aktuelle Temperatur)
+		 && getTemperature_minute  != g_minute  							// und zu dieser Minute noch keine Temperaturermittling stattgefunden hat
 		) {
-		temperatur_minute = g_minute;
+		getTemperature_minute = g_minute;
 		mywc_g_temperature = GetTemperature(CONFIG.city);
 	}
 #endif
 
-	if (mode_change == true) {
+	switch (myMode) {
 
-		mode_change = false;
+	case MODE_TIME_FIRST:
+		showTime(g_hour, g_minute);
 
-		Serial.println("ModeChange " + String(myMode));
+        myMode = MODE_TIME;
+		break;
 
-		switch (myMode) {
-
-		case MODE_TIME:
-
-			showTime(g_hour, g_minute);
-			break;
+    case MODE_TIME:
+		// Nix tun. Die Zeit sollte bereits angezeigt werden und dann warten, auf eine neue Minute
+		break;
 
 #ifdef GEBURTSTAGE
-		case MODE_BIRTHDAY:
+	case MODE_BIRTHDAY_FIRST:
 #ifdef LAUFSCHRIFT
-			if (isGeburtstagheut(g_heute_tag, g_heute_monat) && ((g_minute % 5) == 0)) {
+		if (isGeburtstagheut(g_heute_tag, g_heute_monat) && ((g_minute % 5) == 0)) {
 
 				Serial.println("Starte Geburtstag");
 
@@ -970,120 +964,84 @@ void loop() {
 				geburtstag_millis= millis();
 			}
 #else
-			// Wenn keine Geburtstagslaufschrift, dann durchschalten auf MODE_TIME_TIME
-			// myMode = MODE_TIME;
-			// Serial.println("MODE_TIME");
-			// mode_change = true;
-
+		// Wenn keine Geburtstagslaufschrift, dann MODE durchschalten
 #endif
-			break;
-
-#endif
-
-#ifdef TEMPERATURE
-		case MODE_TEMP:
-			//
-			// Auf Temperaturanzeige umschalten, wenn eine Temperatur ermittelt wurde, Temperaturanzeige aktiv ist und zu dieser Minute noch keine Temperatur angezeigt wurde
-			// temperatur_minute ist die Zeit zu der zuletzt die Temperatur angezeigt wurde
-			//
-			if (	CONFIG.temp_active == TEMPERATURE_MINUTE
-				|| (CONFIG.temp_active == TEMPERATURE_5MINUTE && ((g_minute%5)==0))
-				) {
-				// temperaturanzeige starten
-				temperatur_minute = g_minute;			// zu dieser Minute die Temperaturanzeige nicht mehr starten
-				temperatur_millis = millis();		// zur Realisierung einer Anzeigedauer diese Startzeit der Anzeige merken
-
-				showTemperature(mywc_g_temperature);
-				// Temperaturanzeige wird in mode_temperatur beendet
-			}
-			else {
-				// zu dieser Minute keine Temperaturanzeige
-#ifdef GEBURTSTAGE
-				myMode = MODE_BIRTHDAY;
-				Serial.println("MODE_BIRTHDAY");
-				mode_change = true;
-#else
-				myMode = MODE_TIME;
-				Serial.println("MODE_TIME");
-				mode_change = true;
-#endif
-			}
-
-			break;
-#endif
-		default:
-
-			showTime(g_hour, g_minute);
+        myMode = MODE_BIRTHDAY;
 		break;
 
-		}
-	}
-	else {
-
-		//Serial.println("No Mode Change " + String(myMode) + " mode_change=" + String(mode_change));
-
-		// Diese Aktionen werden durchlaufen, solange der Modus unverändert ist
-		//
-		switch (myMode) {
-
-		case MODE_TIME:
-			// Nix tun. Die Zeit sollte bereits angezeigt werden und dann warten, auf eine neue Minute
-			break;
-
-#ifdef TEMPERATURE
-		case MODE_TEMP:
-			// Temperatur ist angezeigt worden,
-			//		zur Minute temperatur_minute
-			//		und getstartet um temperatur_millis
-			// 	Ausschalten nach x Milisekunden
+	case MODE_BIRTHDAY:
+		if (!geburtstag_ende) {
 			jetzt = millis();
 
+			Serial.println("Warte Geburtstag " + String(jetzt) + " geburtstag_millis=" + String(geburtstag_millis) + " Diff=" + String(jetzt - geburtstag_millis));
 
-			if (jetzt>temperatur_millis+TEMPERATURE_DURATION || jetzt < temperatur_millis) {
-				Serial.println("Ende Temp");
+			if (jetzt>geburtstag_millis+LAUFSCHRIFT_SPEED || jetzt < geburtstag_millis) {
+				//einen Schritt in der Laufschrift
+				geburtstag_ende = stepLaufschrift();
+				geburtstag_millis = jetzt;
+
+			}
+		}
+		else {
+			myMode = MODE_TIME_FIRST;
+		}
+		break;
+#endif
+
+#ifdef TEMPERATURE
+	case MODE_TEMP_FIRST:
+		//
+		// Auf Temperaturanzeige umschalten, wenn eine Temperatur ermittelt wurde, Temperaturanzeige aktiv ist und zu dieser Minute noch keine Temperatur angezeigt wurde
+		// getTemperature_minute ist die Zeit zu der zuletzt die Temperatur angezeigt wurde
+		//
+		if (	CONFIG.temp_active == TEMPERATURE_MINUTE
+			|| (CONFIG.temp_active == TEMPERATURE_5MINUTE && ((g_minute%5)==0))
+			) {
+			// temperaturanzeige starten
+			//getTemperature_minute = g_minute;		// zu dieser Minute die Temperaturanzeige nicht mehr starten
+			temperatur_millis = millis();		// zur Realisierung einer Anzeigedauer diese Startzeit der Anzeige merken
+
+			showTemperature(mywc_g_temperature);
+			// Temperaturanzeige wird in mode_temperatur beendet
+
+            myMode = MODE_TEMP;
+		}
+		else {
+			// zu dieser Minute keine Temperaturanzeige
 #ifdef GEBURTSTAGE
-				myMode = MODE_BIRTHDAY;
-				Serial.println("MODE_BIRTHDAY");
-				mode_change = true;
+			myMode = MODE_BIRTHDAY_FIRST;
 #else
-				myMode = MODE_TIME;
-				Serial.println("MODE_TIME");
-				mode_change = true;
-#endif
-			}
-			else {
-				;	// nix tun, nur auf den nächsten Durchlauf warten, die Temperatur wird angezeigt, aber die Zeit TEMPERATURE_DURATION ist noch nicht abgelaufen
-			}
-
-			break;
-#endif
-
-#ifdef GEBURTSTAGE
-		case MODE_BIRTHDAY:
-
-			if (!geburtstag_ende) {
-				jetzt = millis();
-
-				Serial.println("Warte Geburtstag " + String(jetzt) + " geburtstag_millis=" + String(geburtstag_millis) + " Diff=" + String(jetzt - geburtstag_millis));
-
-				if (jetzt>geburtstag_millis+LAUFSCHRIFT_SPEED || jetzt < geburtstag_millis) {
-					//einen Schritt in der Laufschrift
-					geburtstag_ende = stepLaufschrift();
-					geburtstag_millis = jetzt;
-
-				}
-			}
-			else {
-				Serial.println("Ende Geburtstag");
-				myMode = MODE_TIME;
-				Serial.println("MODE_TIME");
-				mode_change = true;
-			}
-			break;
+			myMode = MODE_TIME_FIRST;
 #endif
 		}
-	}
+		break;
 
+    case MODE_TEMP:
+		// Temperatur ist angezeigt worden,
+		//		zur Minute getTemperature_minute
+		//		und getstartet um temperatur_millis
+		// 	Ausschalten nach x Milisekunden
+		jetzt = millis();
+
+		if (jetzt>temperatur_millis+TEMPERATURE_DURATION || jetzt < temperatur_millis) {
+			Serial.println("Ende Temp");
+#ifdef GEBURTSTAGE
+			myMode = MODE_BIRTHDAY_FIRST;
+#else
+			myMode = MODE_TIME_FIRST;
+#endif
+		}
+		else {
+			;	// nix tun, nur auf den nächsten Durchlauf warten, die Temperatur wird angezeigt, aber die Zeit TEMPERATURE_DURATION ist noch nicht abgelaufen
+		}
+		break;
+#endif
+
+    default:
+        showTime(g_hour, g_minute);
+        break;
+
+	}
 
 	//
 	// Diese Aktionen bei jedem Schleifendurchlauf
