@@ -36,8 +36,12 @@
 
 #define CONFIGFILE "/wordclock_config.json"
 
-#define MODE_TIME_FIRST 5
-#define MODE_TIME       6
+#define MODE_TEMP_FIRST     1
+#define MODE_TEMP 			2
+#define MODE_BIRTHDAY_FIRST 3
+#define MODE_BIRTHDAY       4
+#define MODE_TIME_FIRST     5
+#define MODE_TIME           6
 
 typedef struct {
   CRGB color_bg;

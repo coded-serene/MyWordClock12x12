@@ -3,9 +3,6 @@
 
 #ifdef GEBURTSTAGE
 
-#define MODE_BIRTHDAY       4
-#define MODE_BIRTHDAY_FIRST 5
-
 #ifdef GEBURTSTAGE_CPP
 
 //

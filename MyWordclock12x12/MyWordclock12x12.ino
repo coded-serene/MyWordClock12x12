@@ -91,15 +91,15 @@ int hour                        = -1;
 int minute                      = -1;
 
 static int myMode;			                         // aktueller Anzeigemodus für den Zustandsautomaten
-static bool mode_change;
+// static bool mode_change;
 
 #ifdef TEMPERATURE
-int getTemperature_minute       = -1;				// Minute, zu der zum letzten Mal die Temperatur angezeigt wurde
+// int getTemperature_minute       = -1;				// Minute, zu der zum letzten Mal die Temperatur angezeigt wurde
 unsigned long temperatur_millis = -1;
 #endif
 
 #ifdef GEBURTSTAGE
-int geburtstag_minute           = -1;				// Minute, zu der zum letzten Mal die Geburtstagslaufschrift angezeigt wurde
+// int geburtstag_minute           = -1;				// Minute, zu der zum letzten Mal die Geburtstagslaufschrift angezeigt wurde
 unsigned long geburtstag_millis = -1;
 int geburtstag_ende             = 0;
 #endif
@@ -872,8 +872,7 @@ void setup() {
 #endif
 
     g_heute_tag        = -1;
-    myMode             = MODE_TEMP;			// aktueller Anzeigemodus für den Zustandsautomaten
-    mode_change        = true;
+    myMode             = MODE_TEMP_FIRST;			// aktueller Anzeigemodus für den Zustandsautomaten
 #ifdef TEMPERATURE
     mywc_g_temperature = ERR_TEMP;
 #endif
@@ -909,8 +908,7 @@ void loop() {
 		minute 		= g_minute;
 
 		// wir starten mit der Temperatur....
-		myMode 		= MODE_TEMP;
-		mode_change	= true;
+		myMode 		= MODE_TEMP_FIRST;
 
 		// Falls gerade die Dunkelschaltung erfolgt...
 		setBrightness(BRIGHTNESS_AUTO);
@@ -922,20 +920,6 @@ void loop() {
 		}
 	}
 
-#ifdef TEMPERATURE
-	//
-	// Temperatur alle 15 Minuten aktualisieren, oder falls keine Temperatur ermittelt werden konnte
-	//
-	// im Idealfall wird die Temperatur nur alle 15 Minuten ermittelt
-	//
-	if	(   CONFIG.temp_active != TEMPERATURE_AUS 						// wenn überhaupt das Temperatur-Feature aktiviert ist
-         && ((g_minute % 15) == 0 || mywc_g_temperature == ERR_TEMP) 	// und entweder die Temperatur ermittelt werden soll (alle Viertelstunde) oder muss (keine aktuelle Temperatur)
-		 && getTemperature_minute  != g_minute  							// und zu dieser Minute noch keine Temperaturermittling stattgefunden hat
-		) {
-		getTemperature_minute = g_minute;
-		mywc_g_temperature = GetTemperature(CONFIG.city);
-	}
-#endif
 
 	switch (myMode) {
 
@@ -960,7 +944,7 @@ void loop() {
 				// und es gibt einen Geburtstag
 				startLaufschrift("HAPPY BIRTHDAY," + getGebName(g_heute_tag, g_heute_monat) + "!");
 				geburtstag_ende = false;
-				geburtstag_minute = g_minute;
+				// geburtstag_minute = g_minute;
 				geburtstag_millis= millis();
 			}
 #else
@@ -979,7 +963,6 @@ void loop() {
 				//einen Schritt in der Laufschrift
 				geburtstag_ende = stepLaufschrift();
 				geburtstag_millis = jetzt;
-
 			}
 		}
 		else {
@@ -990,30 +973,45 @@ void loop() {
 
 #ifdef TEMPERATURE
 	case MODE_TEMP_FIRST:
-		//
-		// Auf Temperaturanzeige umschalten, wenn eine Temperatur ermittelt wurde, Temperaturanzeige aktiv ist und zu dieser Minute noch keine Temperatur angezeigt wurde
-		// getTemperature_minute ist die Zeit zu der zuletzt die Temperatur angezeigt wurde
-		//
-		if (	CONFIG.temp_active == TEMPERATURE_MINUTE
-			|| (CONFIG.temp_active == TEMPERATURE_5MINUTE && ((g_minute%5)==0))
-			) {
-			// temperaturanzeige starten
-			//getTemperature_minute = g_minute;		// zu dieser Minute die Temperaturanzeige nicht mehr starten
-			temperatur_millis = millis();		// zur Realisierung einer Anzeigedauer diese Startzeit der Anzeige merken
+        if (CONFIG.temp_active != TEMPERATURE_AUS) {
+        	//
+        	// Temperatur alle TEMPERATURE_REFETCH_MINUTES Minuten aktualisieren, oder falls keine Temperatur ermittelt werden konnte
+            // Weil der Dienst zu vollen Viertelstunden Fehler lieferte habe ich den REFETCH_SHIFT eingebaut.
+        	//
+        	if	( (g_minute % TEMPERATURE_REFETCH_MINUTES) == TEMPERATURE_REFETCH_SHIFT || mywc_g_temperature == ERR_TEMP) 	{ // wenn die Temperatur ermittelt werden soll oder muss (keine aktuelle Temperatur)
+        		mywc_g_temperature = GetTemperature(CONFIG.city);
+        	}
 
-			showTemperature(mywc_g_temperature);
-			// Temperaturanzeige wird in mode_temperatur beendet
+    		//
+    		// Auf Temperaturanzeige umschalten, wenn eine Temperatur ermittelt wurde, Temperaturanzeige aktiv ist und zu dieser Minute noch keine Temperatur angezeigt wurde
+    		// getTemperature_minute ist die Zeit zu der zuletzt die Temperatur angezeigt wurde
+    		//
+    		if (	CONFIG.temp_active == TEMPERATURE_MINUTE
+    			|| (CONFIG.temp_active == TEMPERATURE_5MINUTE && ((g_minute % 5)==0))
+    			) {
+    			// temperaturanzeige starten
+    			temperatur_millis = millis();		// zur Realisierung einer Anzeigedauer diese Startzeit der Anzeige merken
 
-            myMode = MODE_TEMP;
-		}
-		else {
-			// zu dieser Minute keine Temperaturanzeige
+    			showTemperature(mywc_g_temperature);
+
+                myMode = MODE_TEMP;
+    		}
+    		else {
+    			// zu dieser Minute keine Temperaturanzeige
 #ifdef GEBURTSTAGE
-			myMode = MODE_BIRTHDAY_FIRST;
+			    myMode = MODE_BIRTHDAY_FIRST;
 #else
-			myMode = MODE_TIME_FIRST;
+			    myMode = MODE_TIME_FIRST;
 #endif
-		}
+		    }
+        }
+        else {
+#ifdef GEBURTSTAGE
+		    myMode = MODE_BIRTHDAY_FIRST;
+#else
+		    myMode = MODE_TIME_FIRST;
+#endif
+        }
 		break;
 
     case MODE_TEMP:
@@ -1024,16 +1022,14 @@ void loop() {
 		jetzt = millis();
 
 		if (jetzt>temperatur_millis+TEMPERATURE_DURATION || jetzt < temperatur_millis) {
-			Serial.println("Ende Temp");
+            // Zum nächsten Mode weiterschalten
 #ifdef GEBURTSTAGE
 			myMode = MODE_BIRTHDAY_FIRST;
 #else
 			myMode = MODE_TIME_FIRST;
 #endif
 		}
-		else {
-			;	// nix tun, nur auf den nächsten Durchlauf warten, die Temperatur wird angezeigt, aber die Zeit TEMPERATURE_DURATION ist noch nicht abgelaufen
-		}
+
 		break;
 #endif
 

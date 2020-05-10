@@ -14,27 +14,30 @@
 //
 // globale Variable
 //
-int mywc_g_temperature 				= ERR_TEMP;	// temperatur
-String mywc_g_temperature_real_location;		// von wttr.in tatsächlich genutzter Ort, zur Ausgabe auf der Webseite
+int     mywc_g_temperature 				 = ERR_TEMP; // temperatur
+String  mywc_g_temperature_real_location;		     // von wttr.in tatsächlich genutzter Ort, zur Ausgabe auf der Webseite
 
+String  mywc_g_debug_temperature;
 
 // Modulvariable
-int l_last_valid_temperature 		= ERR_TEMP;	// Wert der letzten erfolgreichen Temperaturabfrage
-int l_last_valid_temperature_hour 	= -1;		// Zeitwert der letzten erfolgreichen Temperaturabfrage, Stunde
-int l_last_valid_temperature_minute	= -1;		// Zeitwert der letzten erfolgreichen Temperaturabfrage, Minuten
+int     l_last_valid_temperature 		= ERR_TEMP; // Wert der letzten erfolgreichen Temperaturabfrage
+int     l_last_valid_temperature_hour 	= -1;       // Zeitwert der letzten erfolgreichen Temperaturabfrage, Stunde
+int     l_last_valid_temperature_minute = -1;       // Zeitwert der letzten erfolgreichen Temperaturabfrage, Minuten
 
-unsigned int ZeitDifferenzMinuten(int h1, int m1, int h2, int m2) {
-  time_t time1;
-  time_t time2;
+int ZeitDifferenzMinuten(int m1, int h1, int m2, int h2) {
+    // h1:m1 ist die kleinere Zeit (älter)
+    unsigned int time1;
+    unsigned int time2;
 
-  time1 = 60*m1 + 3600*h1;
-  time2 = 60*m2 + 3600*h2;
+    // Zeiten in Minuten umrechnen
+    time1 = m1 + 60*h1;
+    time2 = m2 + 60*h2;
 
-  if (time2 < time1) {
-    time2 += 24*3600;
-  }
+    if (time2 < time1) {
+        time2 += 24*60;
+    }
 
-  return (unsigned int)((time2 - time1) / 60);
+    return ((int)time2 - (int)time1);
 }
 
 // Farbabstufung der Temperaturanzeige
@@ -80,15 +83,20 @@ CRGB GetTemperatureColor(int t) {
 void showTemperature(int t) {
 
     unsigned int anz_leds;
-    unsigned int letzte_gueltige_temperatur_vor_minuten;
+    int letzte_gueltige_temperatur_vor_minuten;
     CRGB c;
 
     resetLEDs();
+    anz_leds = 0;
 
     if (t == ERR_TEMP) {
         // die Temperatur konnte nicht ermittelt werden
 
-        letzte_gueltige_temperatur_vor_minuten = ZeitDifferenzMinuten(l_last_valid_temperature_minute, l_last_valid_temperature_hour, g_minute, g_hour);
+        letzte_gueltige_temperatur_vor_minuten = ZeitDifferenzMinuten(l_last_valid_temperature_minute, l_last_valid_temperature_hour, g_minute, g_hour) - TEMPERATURE_REFETCH_MINUTES + 1;
+
+        mywc_g_debug_temperature = mywc_g_debug_temperature + "<hr>Letzte_Vor_Minuten:" + String(letzte_gueltige_temperatur_vor_minuten) +" = " + String(l_last_valid_temperature_hour) + ":" + String(l_last_valid_temperature_minute) +"-" + String(g_hour) +":" + String(g_minute);
+        if (mywc_g_debug_temperature.length() > 1024)
+            mywc_g_debug_temperature = mywc_g_debug_temperature.substring(mywc_g_debug_temperature.length()  - 1024);
 
         anz_leds = letzte_gueltige_temperatur_vor_minuten;	// pro Minute eine LED
 
@@ -99,14 +107,7 @@ void showTemperature(int t) {
             anz_leds = 4;
         }
 
-        if	(	l_last_valid_temperature == ERR_TEMP
-            || ( letzte_gueltige_temperatur_vor_minuten > 30)
-        ) {
-            // und es ist keine gueltige vorherige Temperatur bekannt
-            // oder die ist aelter als ERR_TEMP_TOLERANCE_MINUTES Minuten
-            setWord(W_GRAD, CRGB::Red);
-        }
-        else {
+        if	(   letzte_gueltige_temperatur_vor_minuten <= TEMPERATURE_REFETCH_MINUTES ) {
             setWord(wordsindex_single_m[anz_leds], CRGB::Red);
             t = l_last_valid_temperature;
         }
@@ -131,6 +132,9 @@ void showTemperature(int t) {
         setWord(W_ES_IST, c);
         setNumber(t, c);
         setWord(W_GRAD, c);
+    }
+    else {
+        setWord(W_GRAD, CRGB::Red);
     }
 
     FastLED.show();
@@ -254,7 +258,7 @@ int GetTemperature(String city) {
         http.begin(weatherstring);
         httpCode = http.GET();
 
-        /// HTTP client errors
+        // HTTP client errors
         // HTTPC_ERROR_CONNECTION_REFUSED  (-1)
         // HTTPC_ERROR_SEND_HEADER_FAILED  (-2)
         // HTTPC_ERROR_SEND_PAYLOAD_FAILED (-3)
@@ -281,8 +285,6 @@ int GetTemperature(String city) {
                 l_last_valid_temperature_minute = g_minute;
                 l_last_valid_temperature_hour   = g_hour;
                 errorstring = errorstring + "<br>\n" + GetDatumZeitString() + String(" ") + String(temperature) + String("&deg;C");
-
-                Serial.println(temperature);
             }
         }
         else {
@@ -299,8 +301,12 @@ int GetTemperature(String city) {
     mywc_g_temperature_real_location = GetTemperatureRealLocation(city);
 
     if (errorstring != "") {
-        mywc_g_temperature_real_location = mywc_g_temperature_real_location+ String("<br>") + errorstring;
+        mywc_g_temperature_real_location = errorstring + String("<br>") + mywc_g_temperature_real_location;
     }
+
+    mywc_g_debug_temperature = mywc_g_debug_temperature + "<hr>" + mywc_g_temperature_real_location;
+    if (mywc_g_debug_temperature.length() > 1024)
+        mywc_g_debug_temperature = mywc_g_debug_temperature.substring(mywc_g_debug_temperature.length()  - 1024);
 
     return temperature;
 }

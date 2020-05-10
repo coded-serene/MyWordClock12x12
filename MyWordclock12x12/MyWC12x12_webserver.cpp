@@ -195,6 +195,7 @@ String getTimeForm() {
   content += "<label>Ort</label>";
   content += "<input name=\"city\" value=\"" + String(CONFIG.city) + "\">";
   content += "<p style=\"font-size:0.75em;\">" + mywc_g_temperature_real_location + "</p>";
+  content += "<hr><p style=\"font-size:0.75em;\">" + mywc_g_debug_temperature + "</p>";
   content += "</div>";
 #endif
 
@@ -357,7 +358,7 @@ void handleRootPath() {
   content += "<form class=\"form\" method=\"post\" action=\"\">";
 
   content += "<div>";
-  content += "<p>Es ist jetzt " + String(g_hour) + ":" + String(g_minute) + "Uhr am " + String(g_heute_tag) + "." + String(g_heute_monat) + "." + String(g_heute_jahr) + "</p";
+  content += "<p>Es ist jetzt " + pad(g_hour) + ":" + pad(g_minute) + "Uhr am " + pad(g_heute_tag) + "." + pad(g_heute_monat) + "." + pad(g_heute_jahr) + "</p";
   content += "<div>";
 
   content += "<div>";
@@ -372,7 +373,7 @@ void handleRootPath() {
   content += "<hr label=\"Zurücksetzen\">";
 
   content += "<div>";
-  content += "<p>Letzter Neustart " + String(g_reboot_hour) + ":" + String(g_reboot_minute) + "Uhr am " + String(g_reboot_heute_tag) + "." + String(g_reboot_heute_monat) + "." + String(g_reboot_heute_jahr) + "</p";
+  content += "<p>Letzter Neustart " + pad(g_reboot_hour) + ":" + pad(g_reboot_minute) + "Uhr am " + pad(g_reboot_heute_tag) + "." + pad(g_reboot_heute_monat) + "." + pad(g_reboot_heute_jahr) + "</p";
   content += "<div>";
 
   content += "<div>";
