@@ -21,25 +21,8 @@ String  mywc_g_debug_temperature;
 
 // Modulvariable
 int     l_last_valid_temperature 		= ERR_TEMP; // Wert der letzten erfolgreichen Temperaturabfrage
-// int     l_last_valid_temperature_hour 	= -1;       // Zeitwert der letzten erfolgreichen Temperaturabfrage, Stunde
-// int     l_last_valid_temperature_minute = -1;       // Zeitwert der letzten erfolgreichen Temperaturabfrage, Minuten
-int     l_temperature_error_count       = 0;
+int     l_temperature_error_count       = 1;
 
-// int ZeitDifferenzMinuten(int m1, int h1, int m2, int h2) {
-//     // h1:m1 ist die kleinere Zeit (älter)
-//     unsigned int time1;
-//     unsigned int time2;
-//
-//     // Zeiten in Minuten umrechnen
-//     time1 = m1 + 60*h1;
-//     time2 = m2 + 60*h2;
-//
-//     if (time2 < time1) {
-//         time2 += 24*60;
-//     }
-//
-//     return ((int)time2 - (int)time1);
-// }
 
 // Farbabstufung der Temperaturanzeige
 //
@@ -92,9 +75,6 @@ void showTemperature(int t) {
 
     if (t == ERR_TEMP) {
         // die Temperatur konnte nicht ermittelt werden
-
-        // letzte_gueltige_temperatur_vor_minuten = ZeitDifferenzMinuten(l_last_valid_temperature_minute, l_last_valid_temperature_hour, g_minute, g_hour) - TEMPERATURE_REFETCH_MINUTES + 1;
-
         mywc_g_debug_temperature = mywc_g_debug_temperature + "<hr>Fehlerhafte Versuche:" + String(l_temperature_error_count);
         if (mywc_g_debug_temperature.length() > 1024)
             mywc_g_debug_temperature = mywc_g_debug_temperature.substring(mywc_g_debug_temperature.length()  - 1024);

@@ -8,7 +8,7 @@
 
 #define TEMPERATURE_DURATION 	    5000    // Anzeigedauer in Millisekunden
 #define TEMPERATURE_REFETCH_MINUTES 15      // Abstand in Minuten in dem die Temperatur neu geholt wird. Wg. Modulo-Operation idealerweise ein Teiler von 60
-#define TEMPERATURE_REFETCH_SHIFT   0       // Anscheinend ist die Abfrage zu ganzen Viertelstunden problematisch. Also verschiebe ich die Abfrage um 1 Minuten
+#define TEMPERATURE_REFETCH_SHIFT   1       // Anscheinend ist die Abfrage zu ganzen Viertelstunden problematisch. Also verschiebe ich die Abfrage um 1 Minuten
 
 #define ERR_TEMP  				    1000 	                            // Fehlerwert, wenn die Temperatur nicht ermittelt werden kann
 #define ERR_TEMP_TOLERANCE_MINUTES  (2 * TEMPERATURE_REFETCH_MINUTES)   // erst nach 15 Minuten ohne aktuelle Temperatur einen Fehler (rotes Wort GRAD) anzeigen

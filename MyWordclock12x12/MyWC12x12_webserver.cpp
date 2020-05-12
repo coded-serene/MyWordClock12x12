@@ -195,7 +195,7 @@ String getTimeForm() {
   content += "<label>Ort</label>";
   content += "<input name=\"city\" value=\"" + String(CONFIG.city) + "\">";
   content += "<p style=\"font-size:0.75em;\">" + mywc_g_temperature_real_location + "</p>";
-  content += "<hr><p style=\"font-size:0.75em;\">" + mywc_g_debug_temperature + "</p>";
+  content += "<!-- hr><p style=\"font-size:0.75em;\">" + mywc_g_debug_temperature + "</p> -->";
   content += "</div>";
 #endif
 
@@ -385,21 +385,21 @@ void handleRootPath() {
   content += "<div>";
   content += "<button name=\"submit\" type=\"submit\" class=\"danger\" value=\"ResetAll\" background-color: red;>Komplett zur&uuml;cksetzen und Reboot</button>";
   content += "</div>";
-
-  content += "<hr label=\"Tests\">";
-
-  content += "<div>";
-  content += "<button name=\"submit\" type=\"submit\" class=\"test\" value=\"testLocale\">Test Region</button>";
-  content += "</div>";
-  content += "<div>";
-  content += "<button name=\"submit\" type=\"submit\" class=\"test\" value=\"testTemp\">Test Temperatur</button>";
-  content += "</div>";
-  content += "<div>";
-  content += "<button name=\"submit\" type=\"submit\" class=\"test\" value=\"testLaufschrift\">Test Laufschrift</button>";
-  content += "</div>";
-  content += "<div>";
-  content += "<button name=\"submit\" type=\"submit\" class=\"test\" value=\"testPower\">Test Stromverbrauch</button>";
-  content += "</div>";
+  //
+  // content += "<hr label=\"Tests\">";
+  //
+  // content += "<div>";
+  // content += "<button name=\"submit\" type=\"submit\" class=\"test\" value=\"testLocale\">Test Region</button>";
+  // content += "</div>";
+  // content += "<div>";
+  // content += "<button name=\"submit\" type=\"submit\" class=\"test\" value=\"testTemp\">Test Temperatur</button>";
+  // content += "</div>";
+  // content += "<div>";
+  // content += "<button name=\"submit\" type=\"submit\" class=\"test\" value=\"testLaufschrift\">Test Laufschrift</button>";
+  // content += "</div>";
+  // content += "<div>";
+  // content += "<button name=\"submit\" type=\"submit\" class=\"test\" value=\"testPower\">Test Stromverbrauch</button>";
+  // content += "</div>";
 
   content += "</form>";
   content += "</body></html>";
