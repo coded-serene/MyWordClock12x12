@@ -889,7 +889,7 @@ void setup() {
 
 void loop() {
 
-#ifdef GEBURTSTAGE || TEMPERATURE
+#if defined(GEBURTSTAGE) || defined(TEMPERATURE)
 	unsigned long jetzt;
 #endif
 
@@ -913,11 +913,11 @@ void loop() {
 		// Falls gerade die Dunkelschaltung erfolgt...
 		setBrightness(BRIGHTNESS_AUTO);
 
-		if (g_minute % 5 == 0) {
+		// if (g_minute % 5 == 0) {
 			// alle 5 Minuten
 			// Falls das WLAN nicht funktioniert, reconnect versuchen
-			(void)wifiManager.autoConnect("WordClock");
-		}
+			// (void)wifiManager.autoConnect("WordClock");
+		// }
 	}
 
 

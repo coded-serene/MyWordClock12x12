@@ -66,8 +66,7 @@ CRGB GetTemperatureColor(int t) {
 //
 void showTemperature(int t) {
 
-    unsigned int anz_leds;
-    int letzte_gueltige_temperatur_vor_minuten;
+    int anz_leds;
     CRGB c;
 
     resetLEDs();
