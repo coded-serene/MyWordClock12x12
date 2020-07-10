@@ -221,14 +221,18 @@ String GetTemperatureRealLocation(String city) {
 int GetTemperature(String city) {
     int httpCode;
     int temperature;
+    int i;
+    int l;
     HTTPClient http;            //Declare object of class HTTPClient
     String weatherstring;
     String payload;
     String temp_temperature;
     String errorstring;
+    String erlaubteZeichen;
 
-    temperature = ERR_TEMP;     // is a kind of error code!
-    errorstring = "";           // kein Fehlertext
+    temperature = ERR_TEMP;             // is a kind of error code!
+    errorstring = "";                   // kein Fehlertext
+    erlaubteZeichen = "+-0123456789";   // ein Temperaturwert besteht aus diesen Zeichen
 
     if (WiFi.status() == WL_CONNECTED) {                            //Check WiFi connection status
         weatherstring = "http://wttr.in/" + city + "?format=\%t";   //Specify request destination
@@ -254,18 +258,29 @@ int GetTemperature(String city) {
         if (httpCode >= HTTP_CODE_OK) {
             payload = http.getString();                  						//Get the response payload
 
-            temp_temperature = payload.substring(0, payload.length() - 4); 	//Format is "+x°C\n" wobei ° zwei Bytes einnimmt!
+            // Parsing robuster gemacht
+            i=0;
+            l=payload.length();
+            temp_temperature = "";
+            
+            while (i<l) {
+                if (erlaubteZeichen.indexOf(payload.charAt(i)) == -1) {
+                    // an dieser Position ist das erste Zeichen, das nicht zur Zahl gehört. Abschneiden!
+                    temp_temperature = payload.substring(0, i+1); 	//Format is "+x°C\n" wobei ° zwei Bytes einnimmt!
 
-            if ((temp_temperature.charAt(0) == '-') || (temp_temperature.charAt(0) == '+')) {
-
-                temperature = temp_temperature.toInt();
-
-                // es gibt eine gültige Temperatur
-                l_last_valid_temperature        = temperature;
-                // l_last_valid_temperature_minute = g_minute;
-                // l_last_valid_temperature_hour   = g_hour;
-                errorstring = errorstring + "<br>\n" + GetDatumZeitString() + String(" ") + String(temperature) + String("&deg;C");
+                    // Schleife abbrechen
+                    break;
+                }
+                i++;
             }
+
+            temperature = temp_temperature.toInt();
+
+            // es gibt eine gültige Temperatur
+            l_last_valid_temperature        = temperature;
+            // l_last_valid_temperature_minute = g_minute;
+            // l_last_valid_temperature_hour   = g_hour;
+            errorstring = errorstring + "<br>\n" + GetDatumZeitString() + String(" ") + String(temperature) + String("&deg;C");
         }
         else {
             Serial.print  ("ERROR getting TEMPERATURE: httpCode=");   Serial.println(httpCode);
