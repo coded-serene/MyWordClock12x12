@@ -892,6 +892,9 @@ void loop() {
 #if defined(GEBURTSTAGE) || defined(TEMPERATURE)
 	unsigned long jetzt;
 #endif
+#ifdef GEBURTSTAGE
+    String geb_name;
+#endif
 
 	//
 	// Zeit aktualisieren
@@ -937,15 +940,20 @@ void loop() {
 	case MODE_BIRTHDAY_FIRST:
 #ifdef LAUFSCHRIFT
 		if (isGeburtstagheut(g_heute_tag, g_heute_monat) && ((g_minute % 5) == 0)) {
+                geb_name = getGebName(g_heute_tag, g_heute_monat);
+                geb_name.trim();
 
-				Serial.println("Starte Geburtstag");
+                if (geb_name != "") {
+                    // Nur starten, falls der Name nicht nur aus Leerzeichen besteht
+    				Serial.println("Starte Geburtstag");
 
-				// Zu dieser Minute ist die Geburtstagslaufschrift noch nicht erschienen
-				// und es gibt einen Geburtstag
-				startLaufschrift("HAPPY BIRTHDAY," + getGebName(g_heute_tag, g_heute_monat) + "!");
-				geburtstag_ende = false;
-				// geburtstag_minute = g_minute;
-				geburtstag_millis= millis();
+    				// Zu dieser Minute ist die Geburtstagslaufschrift noch nicht erschienen
+    				// und es gibt einen Geburtstag
+    				startLaufschrift("HAPPY BIRTHDAY," + geb_name + "!");
+    				geburtstag_ende = false;
+    				// geburtstag_minute = g_minute;
+    				geburtstag_millis= millis();
+                }
 			}
 #else
 		// Wenn keine Geburtstagslaufschrift, dann MODE durchschalten
