@@ -34,7 +34,7 @@
 #include <WiFiManager.h>        // https://github.com/tzapu/WiFiManager
 #include <FastLED.h>            // http://fastled.io      https://github.com/FastLED/FastLED
 #include <NTPClient.h>          // The MIT License (MIT) Copyright (c) 2015 by Fabrice Weinberg
-#include <FS.h>
+#include "LittleFS.h"
 #include <ArduinoJson.h>        // arduinojson.org
 #include <time.h>
 
@@ -187,7 +187,7 @@ void loadConfig() {
 
     defaultConfig();
 
-    File file = SPIFFS.open(CONFIGFILE, "r");
+    File file = LittleFS.open(CONFIGFILE, "r");       // changed from SPIFFS (deprecated) to LittleFS
 
     if (!file) {
         Serial.println("Failed to open config file.");
@@ -253,7 +253,7 @@ void loadConfig() {
 
 
 void saveConfig() {
-  File file = SPIFFS.open(CONFIGFILE, "w");
+  File file = LittleFS.open(CONFIGFILE, "w");
 
   if (!file) {
     Serial.println("Can't open configfile for writing");
@@ -708,7 +708,7 @@ void resetWiFi() {
   wifiManager.resetSettings();
 }
 void resetConfig() {
-  SPIFFS.remove(CONFIGFILE);
+  LittleFS.remove(CONFIGFILE);
 }
 void resetAllAndReboot() {
   resetConfig();
@@ -744,6 +744,8 @@ void restart() {
 	mywc_g_temperature = GetTemperature(CONFIG.city);
 #endif
 
+    Serial.println("restart()");
+    
 	// vllt. ist die Regionaleinstellung geändert...
 	changeLocale();
 
@@ -775,7 +777,7 @@ void setup() {
 
 
 	// Dateisystem initialisieren
-	SPIFFS.begin();
+	LittleFS.begin();
 
 	// Konfiguration laden
 	loadConfig();
@@ -843,7 +845,7 @@ void setup() {
 			  type = "filesystem";
 			}
 
-			// NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
+			// NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using LittleFS.end()
 			Serial.println("OTA start updating " + type);
 	});
 	ArduinoOTA.onEnd([]() {
@@ -889,7 +891,7 @@ void setup() {
 
 void loop() {
 
-#ifdef GEBURTSTAGE || TEMPERATURE
+#if defined(GEBURTSTAGE) || defined(TEMPERATURE)
 	unsigned long jetzt;
 #endif
 
@@ -913,11 +915,11 @@ void loop() {
 		// Falls gerade die Dunkelschaltung erfolgt...
 		setBrightness(BRIGHTNESS_AUTO);
 
-		if (g_minute % 5 == 0) {
+		if ((g_minute % 5 == 0) && (WiFi.status() != WL_CONNECTED)) {
 			// alle 5 Minuten
 			// Falls das WLAN nicht funktioniert, reconnect versuchen
-			(void)wifiManager.autoConnect("WordClock");
-		}
+            (void)wifiManager.autoConnect("WordClock");
+        }
 	}
 
 
@@ -982,6 +984,8 @@ void loop() {
         		mywc_g_temperature = GetTemperature(CONFIG.city);
         	}
 
+            Serial.println("MODE_TEMP_FIRST");
+            Serial.println(mywc_g_temperature);
     		//
     		// Auf Temperaturanzeige umschalten, wenn eine Temperatur ermittelt wurde, Temperaturanzeige aktiv ist und zu dieser Minute noch keine Temperatur angezeigt wurde
     		// getTemperature_minute ist die Zeit zu der zuletzt die Temperatur angezeigt wurde
