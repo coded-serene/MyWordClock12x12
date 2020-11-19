@@ -227,8 +227,8 @@ String GetTemperatureRealLocation(String city) {
 int GetTemperature(String city) {
     int httpCode;
     int temperature;
-    int i;
-    int l;
+    //int i;
+    //int l;
     HTTPClient http;            //Declare object of class HTTPClient
     WiFiClient client;
     String weatherstring;
@@ -272,7 +272,8 @@ int GetTemperature(String city) {
             //if ((temp_temperature.charAt(0) == '-') || (temp_temperature.charAt(0) == '+')) {
             if ((payload.charAt(0) == '-') || (payload.charAt(0) == '+')) {
                 temperature = payload.toInt();
-
+            }
+            
             // es gibt eine gültige Temperatur
             l_last_valid_temperature        = temperature;
             // l_last_valid_temperature_minute = g_minute;
