@@ -8,12 +8,14 @@
 #define LAUFSCHRIFT 1
 #define TEMPERATURE 1
 #define FEATURE_OTA 1
+#undef FEATURE_BG
 
 //#undef GEBURTSTAGE
 //#undef LAUFSCHRIFT
 //#undef TEMPERATURE
 //#undef LOCALE
 //#undef FEATURE_OTA
+//define FEATURE_BG
 
 
 #define FASTLED_INTERNAL			// unterdrücken der PRAGMA-Meldungen in FastLED
@@ -44,7 +46,9 @@
 #define MODE_TIME           6
 
 typedef struct {
+#ifdef FEATURE_BG
   CRGB color_bg;
+#endif
   CRGB color_fg;
   int brightness;
   int timezone;

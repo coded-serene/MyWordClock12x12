@@ -76,11 +76,13 @@ String getTimeForm() {
   content += "<input name=\"fg\" value=\"#" + rgbToHex(CONFIG.color_fg) + "\" type=\"color\">";
   content += "</div>";
 
+#ifdef FEATURE_BG
   // Hintergrundfarbe
   content += "<div>";
   content += "<label>Hintergrundfarbe</label>";
   content += "<input name=\"bg\" value=\"#" + rgbToHex(CONFIG.color_bg) + "\" type=\"color\">";
   content += "</div>";
+#endif
 
   // Helligkeit
   content += "<div>";
@@ -283,7 +285,9 @@ void change() {
 		else if (server.arg("submit") == "save") {
 
 			if (server.hasArg("fg")) 							CONFIG.color_fg 					= hexToRgb(server.arg("fg"));
+#ifdef FEATURE_BG
 			if (server.hasArg("bg")) 							CONFIG.color_bg 					= hexToRgb(server.arg("bg"));
+#endif
 			if (server.hasArg("brightness")) 					CONFIG.brightness 					= server.arg("brightness").toInt();
 
 			if (server.hasArg("tz")) 							CONFIG.timezone 					= server.arg("tz").toInt();

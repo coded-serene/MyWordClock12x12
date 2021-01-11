@@ -144,7 +144,9 @@ void changeLocale() {
 
 void defaultConfig() {
     // Falbackwerte
+#ifdef FEATURE_BG
     CONFIG.color_bg                     = CRGB::Black;
+#endif
     CONFIG.color_fg 					= CRGB::White;
     CONFIG.brightness                   = BRIGHTNESS_DEFAULT; // %
 
@@ -201,10 +203,11 @@ void loadConfig() {
     deserializeJson(doc, file);
 
     Serial.println(doc.as<String>());
-
+#ifdef FEATURE_BG
     CONFIG.color_bg.r 				    = doc["color_bg_r"].as<int>();
     CONFIG.color_bg.g 				    = doc["color_bg_g"].as<int>();
     CONFIG.color_bg.b 				    = doc["color_bg_b"].as<int>();
+#endif
 
     CONFIG.color_fg.r 				    = doc["color_fg_r"].as<int>();
     CONFIG.color_fg.g 				    = doc["color_fg_g"].as<int>();
@@ -265,9 +268,11 @@ void saveConfig() {
 
   StaticJsonDocument<1024> doc;
 
+#ifdef FEATURE_BG
   doc["color_bg_r"] 				= CONFIG.color_bg.r;
   doc["color_bg_g"] 				= CONFIG.color_bg.g;
   doc["color_bg_b"] 				= CONFIG.color_bg.b;
+#endif
   doc["color_fg_r"] 				= CONFIG.color_fg.r;
   doc["color_fg_g"] 				= CONFIG.color_fg.g;
   doc["color_fg_b"] 				= CONFIG.color_fg.b;
@@ -437,7 +442,11 @@ void resetLEDs() {
   int i;
 
   for (i = 0; i < NUM_LEDS; i++) {
+#ifdef FEATURE_BG
     leds[i] = CONFIG.color_bg;
+#else
+    leds[i] = CRGB::Black;
+#endif
 #ifdef GEBURTSTAGE
     mask[i] = false;
 #endif
