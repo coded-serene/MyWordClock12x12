@@ -246,8 +246,8 @@ int GetTemperature(String city) {
 
         Serial.println(weatherstring);
 
-        //http.begin(client, weatherstring);
-        http.begin(weatherstring);
+        http.begin(client, weatherstring);
+        //http.begin(weatherstring);
 
         httpCode = http.GET();
 
@@ -273,7 +273,7 @@ int GetTemperature(String city) {
             if ((payload.charAt(0) == '-') || (payload.charAt(0) == '+')) {
                 temperature = payload.toInt();
             }
-            
+
             // es gibt eine gültige Temperatur
             l_last_valid_temperature        = temperature;
             // l_last_valid_temperature_minute = g_minute;

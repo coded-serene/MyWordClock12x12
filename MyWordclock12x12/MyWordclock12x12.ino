@@ -783,7 +783,9 @@ void setup() {
 #ifdef FEATURE_OTA
 	Serial.println("Feature OTA enabled!");
 #endif
-
+#ifdef FEATURE_BG
+	Serial.println("Feature Background enabled!");
+#endif
 
 	// Dateisystem initialisieren
 	LittleFS.begin();
