@@ -22,7 +22,7 @@ String  mywc_g_debug_temperature;
 // Modulvariable
 int     l_last_valid_temperature 		= ERR_TEMP; // Wert der letzten erfolgreichen Temperaturabfrage
 int     l_temperature_error_count       = 1;
-
+WiFiClient l_client;
 
 // Farbabstufung der Temperaturanzeige
 //
@@ -126,7 +126,6 @@ void showTemperature(int t) {
 // WETTER, Ort holen
 //
 String GetTemperatureRealLocation(String city) {
-  WiFiClient client;
   HTTPClient http;            //Declare object of class HTTPClient
   int httpCode;
   String weatherstring;
@@ -142,7 +141,7 @@ String GetTemperatureRealLocation(String city) {
 
     // Die HTTP-Antwort ist zu groß zum Lesen-In-Einem-Stück >25kB also stückweise lesen und gleich suchen nach Location: ... [
 
-    http.begin(client, weatherstring);
+    http.begin(l_client, weatherstring);
 
     httpCode = http.GET();
 
@@ -155,14 +154,12 @@ String GetTemperatureRealLocation(String city) {
 
       location = "Ort war nicht in der Anfrageantwort enthalten. Antwortl&auml;nge=" + String(len);
 
-      Serial.println(len);
-
       // create buffer for read
       char buff[129] = { 0 };
       buff[128] = (char)0;
 
       // get tcp stream
-      WiFiClient *stream = &client;
+      WiFiClient *stream = &l_client;
       location_start=-1;
       location_end=-1;
 
@@ -187,7 +184,6 @@ String GetTemperatureRealLocation(String city) {
           if (location_start >=0) {
             // aber in diesem frisch gelesenen Puffer
             payload = payload.substring(location_start);
-            Serial.println("Los gehts. Payload=" + payload);
           }
           else {
             // Nicht gefunden. payload kürzen, aber die letzten 11 Zeichen behalten (falls da ein Teil des "Location: " drin steckt
@@ -209,14 +205,13 @@ String GetTemperatureRealLocation(String city) {
       }
     }
     else {
-      Serial.println("ERROR getting TEMPERATURE Location: httpCode=" +  String(httpCode));
       location = GetDatumZeitString() + String(" Fehler bei der Ortsbestimmung: Anfragefehler " + String(httpCode));
     }
 
     http.end();
   }
 
-  Serial.println(location);
+  Serial.println("Return:" + location);
 
   return location;
 }
@@ -227,29 +222,18 @@ String GetTemperatureRealLocation(String city) {
 int GetTemperature(String city) {
     int httpCode;
     int temperature;
-    //int i;
-    //int l;
     HTTPClient http;            //Declare object of class HTTPClient
-    WiFiClient client;
     String weatherstring;
     String payload;
-    //String temp_temperature;
     String errorstring;
-    String erlaubteZeichen;
 
     temperature = ERR_TEMP;             // is a kind of error code!
     errorstring = "";                   // kein Fehlertext
-    erlaubteZeichen = "+-0123456789";   // ein Temperaturwert besteht aus diesen Zeichen
 
     if (WiFi.status() == WL_CONNECTED) {                            //Check WiFi connection status
         weatherstring = "http://wttr.in/" + city + "?format=\%t";   //Specify request destination
 
-        Serial.println(weatherstring);
-
-        http.begin(client, weatherstring);
-        //http.begin(weatherstring);
-
-        httpCode = http.GET();
+        http.begin(l_client, weatherstring);
 
         // HTTP client errors
         // HTTPC_ERROR_CONNECTION_REFUSED  (-1)
@@ -264,50 +248,40 @@ int GetTemperature(String city) {
         // HTTPC_ERROR_STREAM_WRITE        (-10)
         // HTTPC_ERROR_READ_TIMEOUT        (-11)
 
+        httpCode=http.GET();
+
         if (httpCode >= HTTP_CODE_OK) {
+
             payload = http.getString();                  						//Get the response payload
 
-            //temp_temperature = payload.substring(0, payload.indexOf('°')); 	//Format is "+x°C\n" wobei ° zwei Bytes einnimmt!
-
-            //if ((temp_temperature.charAt(0) == '-') || (temp_temperature.charAt(0) == '+')) {
             if ((payload.charAt(0) == '-') || (payload.charAt(0) == '+')) {
                 temperature = payload.toInt();
             }
 
             // es gibt eine gültige Temperatur
             l_last_valid_temperature        = temperature;
-            // l_last_valid_temperature_minute = g_minute;
-            // l_last_valid_temperature_hour   = g_hour;
-            errorstring = errorstring + "<br>\n" + GetDatumZeitString() + String(" ") + String(temperature) + String("&deg;C");
+            errorstring = String("<br>\n") + GetDatumZeitString() + String(" ") + String(temperature) + String("&deg;C");
         }
         else {
-            Serial.print  ("ERROR getting TEMPERATURE: httpCode=");   Serial.println(httpCode);
+            //Serial.println("ERROR getting TEMPERATURE: httpCode=" + String(httpCode));
             errorstring = GetDatumZeitString() + String(" Fehler bei der Temperaturabfrage: Anfragefehler " + String(httpCode));
         }
 
-        http.end();                                           						//Close connection
+        http.end();
     }
     else {
         errorstring = GetDatumZeitString() + String(" Keine WLAN-Verbindung");
     }
 
-    Serial.println(temperature);
-
     mywc_g_temperature_real_location = GetTemperatureRealLocation(city);
-
-    Serial.println(mywc_g_temperature_real_location);
 
     if (errorstring != "") {
         mywc_g_temperature_real_location = errorstring + String("<br>") + mywc_g_temperature_real_location;
     }
 
-    Serial.println(mywc_g_temperature_real_location);
-
     mywc_g_debug_temperature = mywc_g_debug_temperature + "<hr>" + mywc_g_temperature_real_location;
     if (mywc_g_debug_temperature.length() > 1024)
         mywc_g_debug_temperature = mywc_g_debug_temperature.substring(mywc_g_debug_temperature.length()  - 1024);
-
-    Serial.println(mywc_g_debug_temperature);
 
     if (temperature == ERR_TEMP) {
         l_temperature_error_count++;
@@ -315,8 +289,6 @@ int GetTemperature(String city) {
     else {
         l_temperature_error_count = 0;
     }
-
-    Serial.println(l_temperature_error_count);
 
     return temperature;
 }

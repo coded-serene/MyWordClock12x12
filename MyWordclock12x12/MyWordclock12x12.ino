@@ -31,7 +31,7 @@
 
 #include "MyWC12x12_config.h"
 
-#include <WiFiManager.h>        // https://github.com/tzapu/WiFiManager
+#include <WiFiManager.h>        // wifimanager by tablatronix  https://github.com/tzapu/WiFiManager
 #include <FastLED.h>            // http://fastled.io      https://github.com/FastLED/FastLED
 #include <NTPClient.h>          // The MIT License (MIT) Copyright (c) 2015 by Fabrice Weinberg
 #include "LittleFS.h"
@@ -228,7 +228,7 @@ void loadConfig() {
 
 #ifdef TEMPERATURE
     CONFIG.temp_active 				    = doc["temp_active"].as<int>();
-    CONFIG.city 						= doc["city"].as<char *>();
+    CONFIG.city 						    = doc["city"].as<const char *>();
 #endif
 
     CONFIG.locale 					    = doc["locale"].as<int>();
@@ -241,11 +241,11 @@ void loadConfig() {
     CONFIG.geb_3 						= doc["geb_3"].as<int>();
     CONFIG.geb_4 						= doc["geb_4"].as<int>();
     CONFIG.geb_5 						= doc["geb_5"].as<int>();
-    CONFIG.geb_name_1 				    = doc["geb_name_1"].as<char *>();
-    CONFIG.geb_name_2 				    = doc["geb_name_2"].as<char *>();
-    CONFIG.geb_name_3 				    = doc["geb_name_3"].as<char *>();
-    CONFIG.geb_name_4 				    = doc["geb_name_4"].as<char *>();
-    CONFIG.geb_name_5 				    = doc["geb_name_5"].as<char *>();
+    CONFIG.geb_name_1 				    = doc["geb_name_1"].as<const char *>();
+    CONFIG.geb_name_2 				    = doc["geb_name_2"].as<const char *>();
+    CONFIG.geb_name_3 				    = doc["geb_name_3"].as<const char *>();
+    CONFIG.geb_name_4 				    = doc["geb_name_4"].as<const char *>();
+    CONFIG.geb_name_5 				    = doc["geb_name_5"].as<const char *>();
 #endif
 
     CONFIG.herz 						= doc["herz"].as<int>();
@@ -769,7 +769,7 @@ void setup() {
 	IPAddress ipL;
 
 
-	Serial.begin(74880);
+	Serial.begin(115200);
 
 #ifdef GEBURTSTAGE
 	Serial.println("Feature Geburtstage enabled!");
@@ -919,6 +919,8 @@ void loop() {
 	//
 	if (hour != g_hour || minute != g_minute) {
 
+    Serial.println("loop() new minute");
+
 		// neue Minute
 		hour 		= g_hour;
 		minute 		= g_minute;
@@ -994,47 +996,50 @@ void loop() {
 
 #ifdef TEMPERATURE
 	case MODE_TEMP_FIRST:
-        if (CONFIG.temp_active != TEMPERATURE_AUS) {
-        	//
-        	// Temperatur alle TEMPERATURE_REFETCH_MINUTES Minuten aktualisieren, oder falls keine Temperatur ermittelt werden konnte
-            // Weil der Dienst zu vollen Viertelstunden Fehler lieferte habe ich den REFETCH_SHIFT eingebaut.
-        	//
-        	if	( (g_minute % TEMPERATURE_REFETCH_MINUTES) == TEMPERATURE_REFETCH_SHIFT || mywc_g_temperature == ERR_TEMP) 	{ // wenn die Temperatur ermittelt werden soll oder muss (keine aktuelle Temperatur)
-        		mywc_g_temperature = GetTemperature(CONFIG.city);
-        	}
+    if (CONFIG.temp_active != TEMPERATURE_AUS) {
 
-            Serial.println("MODE_TEMP_FIRST");
-            Serial.println(mywc_g_temperature);
-    		//
-    		// Auf Temperaturanzeige umschalten, wenn eine Temperatur ermittelt wurde, Temperaturanzeige aktiv ist und zu dieser Minute noch keine Temperatur angezeigt wurde
-    		// getTemperature_minute ist die Zeit zu der zuletzt die Temperatur angezeigt wurde
-    		//
-    		if (	CONFIG.temp_active == TEMPERATURE_MINUTE
-    			|| (CONFIG.temp_active == TEMPERATURE_5MINUTE && ((g_minute % 5)==0))
-    			) {
-    			// temperaturanzeige starten
-    			temperatur_millis = millis();		// zur Realisierung einer Anzeigedauer diese Startzeit der Anzeige merken
+      Serial.println("MODE_TEMP_FIRST");
+      //
+      // Temperatur alle TEMPERATURE_REFETCH_MINUTES Minuten aktualisieren, oder falls keine Temperatur ermittelt werden konnte
+      // Weil der Dienst zu vollen Viertelstunden Fehler lieferte habe ich den REFETCH_SHIFT eingebaut.
+      //
+      if	( (g_minute % TEMPERATURE_REFETCH_MINUTES) == TEMPERATURE_REFETCH_SHIFT || mywc_g_temperature == ERR_TEMP) 	{ // wenn die Temperatur ermittelt werden soll oder muss (keine aktuelle Temperatur)
+        Serial.println("MODE_TEMP_FIRST Ort=" + CONFIG.city);
+        mywc_g_temperature = GetTemperature(CONFIG.city);
+        Serial.println("MODE_TEMP_FIRST temperature=" + mywc_g_temperature);
+      }
 
-    			showTemperature(mywc_g_temperature);
+      Serial.println(mywc_g_temperature);
+      //
+      // Auf Temperaturanzeige umschalten, wenn eine Temperatur ermittelt wurde, Temperaturanzeige aktiv ist und zu dieser Minute noch keine Temperatur angezeigt wurde
+      // getTemperature_minute ist die Zeit zu der zuletzt die Temperatur angezeigt wurde
+      //
+      if (	CONFIG.temp_active == TEMPERATURE_MINUTE
+        || (CONFIG.temp_active == TEMPERATURE_5MINUTE && ((g_minute % 5)==0))
+      ) {
+        // temperaturanzeige starten
+        temperatur_millis = millis();		// zur Realisierung einer Anzeigedauer diese Startzeit der Anzeige merken
 
-                myMode = MODE_TEMP;
-    		}
-    		else {
+        showTemperature(mywc_g_temperature);
+
+        myMode = MODE_TEMP;
+      }
+    	else {
     			// zu dieser Minute keine Temperaturanzeige
 #ifdef GEBURTSTAGE
 			    myMode = MODE_BIRTHDAY_FIRST;
 #else
 			    myMode = MODE_TIME_FIRST;
 #endif
-		    }
-        }
-        else {
+		  }
+    }
+    else {
 #ifdef GEBURTSTAGE
 		    myMode = MODE_BIRTHDAY_FIRST;
 #else
 		    myMode = MODE_TIME_FIRST;
 #endif
-        }
+    }
 		break;
 
     case MODE_TEMP:

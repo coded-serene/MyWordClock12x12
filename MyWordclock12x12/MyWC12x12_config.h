@@ -2,6 +2,8 @@
 #define CONFIG_H
 
 //
+// 8266 https://arduino.esp8266.com/stable/package_esp8266com_index.json,
+//
 // Feature Toggles aktivieren mit define, deaktivieren mit undef
 //
 #define GEBURTSTAGE 1
@@ -23,8 +25,8 @@
 
 #include <FastLED.h>            	// http://fastled.io      https://github.com/FastLED/FastLED
 
-//#define LEDCOLORORDER RGB			// Je nach LED-Stripe kann RGB oder GRB (oder vllt. auch ein total anderer Typ auszuwählen sein
-#define LEDCOLORORDER GRB
+#define LEDCOLORORDER RGB			// Je nach LED-Stripe kann RGB oder GRB (oder vllt. auch ein total anderer Typ auszuwählen sein
+//#define LEDCOLORORDER GRB
 
 #define DATA_PIN 4
 
