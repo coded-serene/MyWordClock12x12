@@ -22,7 +22,7 @@ String  mywc_g_debug_temperature;
 // Modulvariable
 int     l_last_valid_temperature 		= ERR_TEMP; // Wert der letzten erfolgreichen Temperaturabfrage
 int     l_temperature_error_count       = 1;
-WiFiClient l_client;
+WiFiClientSecure l_client;
 
 // Farbabstufung der Temperaturanzeige
 //
@@ -135,7 +135,7 @@ String GetTemperatureRealLocation(String city) {
   int location_end;
 
   if (WiFi.status() == WL_CONNECTED) {                						//Check WiFi connection status
-    weatherstring = "http://wttr.in/" + city + "?1&lang=en";    //Specify request destination
+    weatherstring = "https://wttr.in/" + city + "?1&lang=en";    //Specify request destination
 
     Serial.println(weatherstring);
 
@@ -231,7 +231,10 @@ int GetTemperature(String city) {
     errorstring = "";                   // kein Fehlertext
 
     if (WiFi.status() == WL_CONNECTED) {                            //Check WiFi connection status
-        weatherstring = "http://wttr.in/" + city + "?format=\%t";   //Specify request destination
+        weatherstring = "https://wttr.in/" + city + "?format=\%t";   //Specify request destination
+
+        l_client.setInsecure(); //the magic line, use with caution
+        //l_client.connect("wttr.in", 443);
 
         http.begin(l_client, weatherstring);
 
@@ -256,11 +259,14 @@ int GetTemperature(String city) {
 
             if ((payload.charAt(0) == '-') || (payload.charAt(0) == '+')) {
                 temperature = payload.toInt();
-            }
 
-            // es gibt eine gültige Temperatur
-            l_last_valid_temperature        = temperature;
-            errorstring = String("<br>\n") + GetDatumZeitString() + String(" ") + String(temperature) + String("&deg;C");
+                // es gibt eine gültige Temperatur
+                l_last_valid_temperature        = temperature;
+                errorstring = String("<br>\n") + GetDatumZeitString() + String(" ") + String(temperature) + String("&deg;C");
+            }
+            else {
+                errorstring = GetDatumZeitString() + String(" Fehler bei der Temperaturabfrage: + oder - nicht gefunden payload=" + payload + "<br>");
+            }
         }
         else {
             //Serial.println("ERROR getting TEMPERATURE: httpCode=" + String(httpCode));
