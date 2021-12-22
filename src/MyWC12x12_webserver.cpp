@@ -221,6 +221,14 @@ String getFormRoot() {
   content += "<input name=\"txtMqttUserName\" value=\"" + String(CONFIG.mqttUserName) + "\" >";
   content += "<label>MQTT-Password</label>";
   content += "<input type='password' name=\"txtMqttPassword\" value=\"" + String(CONFIG.mqttPassword) + "\" >";
+  content += "<div>";
+  content += "<label>Subscripted mqtt-Topic: &lthostname&gt/Config/#</label>";
+  content += "<label>topic 'r': startStop tetris</label>";
+  content += "<label>topic 'a': tetris brick left</label>";
+  content += "<label>topic 's': tetris brick right</label>";
+  content += "<label>topic 'y': tetris brick down</label>";
+  content += "<label>topic ' ': tetris brick flip</label>";
+  content += "</div>";
   content += "</div>";
 /////////////////////
 #ifdef GEBURTSTAGE
@@ -389,17 +397,21 @@ String getFormTetrisGame(void)
 {
   String content = getFormHeaderHtml();
   
-  content += "<h1 align=center >WordClock Konfiguration</h1>";
+  content += "<h1 align=center >Tetris on Wordclock. - Play it!</h1>";
   content += "<form class=\"form\" method=\"post\" action=\"\">";
+  
+  content += "<div> <button name='submit' type='submit' value='flip'>Drehen</button> </div>";
 
-  content += "<div>";
-  content += "<button name=\"submit\" type=\"submit\" value=\"right\">Rechts</button>";
-  content += "</div>";
+  content += "<table width=100%><tr><td>";
   content += "<div>";
   content += "<button name=\"submit\" type=\"submit\" value=\"left\">Links</button>";
   content += "</div>";
-  
-  content += "<div> <button name='submit' type='submit' value='flip'>Drehen</button> </div>";
+  content += "</td><td>";
+  content += "<div>";
+  content += "<button name=\"submit\" type=\"submit\" value=\"right\">Rechts</button>";
+  content += "</div>";
+  content += "</td></tr></table>";
+    
   content += "<div> <button name='submit' type='submit' value='down'>Runter</button> </div>";
   content += "<br/><br/><div> <button class='danger' name='submit' type='submit' value='back'>Start/Restart Game</button> </div>";
 
@@ -434,14 +446,22 @@ void managePathArgsTetrisGame(void)
 	if (server.hasArg("submit")) 
   {
     gameCommand cmd = gameCommand::GameCommandNone; 
-    if (server.hasArg("right"))	{cmd = gameCommand::GameCommandRight;  }
-    if (server.hasArg("left")) 	{cmd = gameCommand::GameCommandLeft; }
-    if (server.hasArg("flip")) 	{cmd = gameCommand::GameCommandFire;  }
-    if (server.hasArg("down")) 	{cmd = gameCommand::GameCommandDown;  }
-    if (server.hasArg("back"))  {cmd = gameCommand::GameCommandStartStop; }
+    if (server.arg("submit") =="right")	{cmd = gameCommand::GameCommandRight;  }
+    if (server.arg("submit") =="left") 	{cmd = gameCommand::GameCommandLeft; }
+    if (server.arg("submit") =="flip") 	{cmd = gameCommand::GameCommandFire;  }
+    if (server.arg("submit") =="down") 	{cmd = gameCommand::GameCommandDown;  }
+    if (server.arg("submit") =="back")  {cmd = gameCommand::GameCommandStartStop; }
 
+    Serial.print("Webserver: Known Tetris-SubmittedCommand: ");
+    Serial.println(cmd);
     handleTetrisCommand(cmd);
 	}
+  else
+  {
+    Serial.print("Webserver: Unrecognized Tetris-SubmittedCommand: ");
+    Serial.print(server.uri());
+    Serial.println(".");
+  }
 
   
 }

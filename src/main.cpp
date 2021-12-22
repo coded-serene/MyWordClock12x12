@@ -10,6 +10,7 @@ void mqttMaintain(void);
 void wifiReconnect(void);
 void setupMQTT(void);
 
+
 WiFiClient espClient;
 PubSubClient m_mqttClient(espClient);
 bool mqttEnabled = true;
@@ -33,6 +34,7 @@ void setup(void)
 void loop(void) 
 {
 	ArduinoOTA.handle();
+	handleClientServer();
 	mqttMaintain();
 
 	if((clockModeActive==false) && (millis() > autoClockActivateTime))

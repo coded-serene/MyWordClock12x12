@@ -14,6 +14,6 @@
 
 typedef enum gameCommand {GameCommandNone, GameCommandLeft, GameCommandRight, GameCommandDown, GameCommandFire, GameCommandStartStop} _gameCommand;
 extern void handleTetrisCommand(gameCommand cmd);
-
+extern void handleClientServer(); // Webserver-Maintain
 
 #endif 
