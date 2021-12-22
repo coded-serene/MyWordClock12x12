@@ -10,3 +10,4 @@ Added features:
 
 Fixed Bugs:
 - Connecion lost when wifi not available (e.g. wifi power off during night)
+- tbs
