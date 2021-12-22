@@ -1,4 +1,4 @@
-This is a fork of Wordclock 12x12 by mr.
+This is a fork of Wordclock 12x12 by @matthiasroessler.
 Added features:
 - esp32-migration
 - plattform.io - migration
