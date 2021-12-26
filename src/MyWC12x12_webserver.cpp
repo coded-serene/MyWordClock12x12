@@ -6,6 +6,7 @@
 #include "MyWC12x12_webserver.h"
 #include "MyWC12x12_temperatur.h"
 #include "main.h"
+#include "Scroller.h"
 
 
 // forward decl
@@ -229,6 +230,10 @@ String getFormRoot() {
   content += "<label>topic 'y': tetris brick down</label>";
   content += "<label>topic ' ': tetris brick flip</label>";
   content += "</div>";
+  content += "<div>";
+  content += "<label>BannerHintText</label><input name=\"txtBannerHintText\" value=\"" + runtimeBannerHintText + "\" >";
+  content += "<label>BannerText (immer an)</label><input name=\"txtBannerText\" value=\"" + runtimeBannerText + "\" >";
+  content += "</div>";
   content += "</div>";
 /////////////////////
 #ifdef GEBURTSTAGE
@@ -300,7 +305,7 @@ void managePathArgsRoot() {
 #endif
 #ifdef LAUFSCHRIFT
 		else if (server.arg("submit") == "testLaufschrift") {
-			testLaufschrift();
+			Scroller::ScrollerTest(runtimeBannerHintText);
 		}
 #endif
 		else if (server.arg("submit") == "ResetConfig") {
@@ -358,6 +363,8 @@ void managePathArgsRoot() {
       if (server.hasArg("txtMqttUserName")) 					{ s = server.arg("txtMqttUserName"); 	CONFIG.mqttUserName = s; }
       if (server.hasArg("txtMqttPassword")) 					{ s = server.arg("txtMqttPassword"); 	CONFIG.mqttPassword = s; }
 
+      if (server.hasArg("txtBannerHintText")) 					{ s = server.arg("txtBannerHintText"); 	runtimeBannerHintText = s; }
+      if (server.hasArg("txtBannerText")) 					{ s = server.arg("txtBannerText"); 	runtimeBannerText = s; }
 			//
 			// Änderungen durchsetzen
 			//
@@ -366,7 +373,7 @@ void managePathArgsRoot() {
 			saveConfig();
 
 			// Werte für die Anzeige aktualisieren und neu starten
-			restart();
+			//restart();
 		}
 	}
 
@@ -512,9 +519,9 @@ void handleRootPath()
   // content += "<div>";
   // content += "<button name=\"submit\" type=\"submit\" class=\"test\" value=\"testTemp\">Test Temperatur</button>";
   // content += "</div>";
-  // content += "<div>";
-  // content += "<button name=\"submit\" type=\"submit\" class=\"test\" value=\"testLaufschrift\">Test Laufschrift</button>";
-  // content += "</div>";
+   content += "<div>";
+  content += "<button name=\"submit\" type=\"submit\" class=\"test\" value=\"testLaufschrift\">Test BannerText</button>";
+  content += "</div>";
   // content += "<div>";
   // content += "<button name=\"submit\" type=\"submit\" class=\"test\" value=\"testPower\">Test Stromverbrauch</button>";
   // content += "</div>";

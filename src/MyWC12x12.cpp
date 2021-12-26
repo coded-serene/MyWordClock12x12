@@ -60,6 +60,7 @@
 #include <LEDText.h>            // LEDText V6 class by Aaron Liddiment (c) 2015
 #include <FontMatrise.h>        // LEDText V6 class by Aaron Liddiment (c) 2015
 
+#include <Scroller.h>
 
 #define FORMAT_LITTLEFS_IF_FAILED true
 #define MATRIX_TYPE    HORIZONTAL_ZIGZAG_MATRIX
@@ -554,59 +555,7 @@ void setNumber(int n, CRGB c = CRGB::White) {
 }
 
 
-#ifdef LAUFSCHRIFT
-void startLaufschrift(String text, CRGB c = CRGB::White) {
-    text = "   " + text;      // smooth in
 
-    text.toCharArray(buffer, 256);
-
-    resetLEDs();
-
-    ScrollingMsg.SetText((unsigned char *)buffer, strlen(buffer));
-    ScrollingMsg.SetTextColrOptions(COLR_RGB | COLR_SINGLE, c.r, c.g, c.b);
-}
-
-int stepLaufschrift() {
-	int i;
-
-	i=ScrollingMsg.UpdateText();
-
-	if (i!= -1) {
-		FastLED.show();
-	}
-
-	return i;
-}
-
-void showLaufschrift(String text, CRGB c = CRGB::White) {
-    char buffer[256];
-
-    Serial.println("Laufschrift " + text);
-
-    text = "   " + text;      // smooth in
-
-    text.toCharArray(buffer, 256);
-
-    resetLEDs();
-
-    ScrollingMsg.SetText((unsigned char *)buffer, strlen(buffer));
-    ScrollingMsg.SetTextColrOptions(COLR_RGB | COLR_SINGLE, c.r, c.g, c.b);
-
-    while (ScrollingMsg.UpdateText() != -1)
-    {
-        FastLED.show();
-        delay(LAUFSCHRIFT_SPEED);
-    }
-}
-
-void testLaufschrift() {
-	startLaufschrift("DIES IST EIN TEST.", CRGB::White);
-
-	while (stepLaufschrift() != -1) {
-		delay(LAUFSCHRIFT_SPEED);
-	}
-}
-#endif
 
 void setHerz() {
 
@@ -699,7 +648,7 @@ void showIP(String sIP) {
 	if (sIP == NULL) return;
 
 #ifdef LAUFSCHRIFT
-	showLaufschrift("WLAN: " + sIP);
+	Scroller::ScrollerShowAndRun("WLAN: " + sIP);
 #else
 	for (unsigned int i = 0; i < sIP.length(); ++i) {
 		resetLEDs();
@@ -1025,7 +974,7 @@ void LoopMyWc(void) {
 
     				// Zu dieser Minute ist die Geburtstagslaufschrift noch nicht erschienen
     				// und es gibt einen Geburtstag
-    				startLaufschrift("HAPPY BIRTHDAY," + geb_name + "!");
+					Scroller::ScrollerInitText("HAPPY BIRTHDAY," + geb_name + "!");
     				geburtstag_ende = false;
     				// geburtstag_minute = g_minute;
     				geburtstag_millis= millis();
@@ -1045,7 +994,7 @@ void LoopMyWc(void) {
 
 			if (jetzt>geburtstag_millis+LAUFSCHRIFT_SPEED || jetzt < geburtstag_millis) {
 				//einen Schritt in der Laufschrift
-				geburtstag_ende = stepLaufschrift();
+				geburtstag_ende = Scroller::ScrollerStepText();
 				geburtstag_millis = jetzt;
 			}
 		}

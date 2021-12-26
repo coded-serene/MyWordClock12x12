@@ -16,4 +16,7 @@ typedef enum gameCommand {GameCommandNone, GameCommandLeft, GameCommandRight, Ga
 extern void handleTetrisCommand(gameCommand cmd);
 extern void handleClientServer(); // Webserver-Maintain
 
+
+extern String runtimeBannerHintText;
+extern String runtimeBannerText;
 #endif 

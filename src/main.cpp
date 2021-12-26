@@ -11,6 +11,9 @@ void wifiReconnect(void);
 void setupMQTT(void);
 
 
+String runtimeBannerHintText;
+String runtimeBannerText;
+
 WiFiClient espClient;
 PubSubClient m_mqttClient(espClient);
 bool mqttEnabled = true;
@@ -46,20 +49,13 @@ void loop(void)
 		autoClockActivateTime=millis()+60000;
 		wishClockMode=true;
 	}
-	bool forceClockUpdate=false;
 	if(clockModeActive==false && wishClockMode==true)
 	{
 		clockModeActive=true;
-		forceClockUpdate=true;
 	}
 	if(clockModeActive)
 	{
-		if(forceClockUpdate)
-		{
-			//wordClock.InitWordClock();
-		}
-		//Serial.println("WordClock.");
-		//wordClock.MaintainWordClock(leds,forceClockUpdate);
+		// wir sind im Clock-Modus
 		LoopMyWc();
 		wishClockMode=false;
 	}

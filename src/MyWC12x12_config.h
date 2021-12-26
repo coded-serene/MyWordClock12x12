@@ -86,6 +86,7 @@ typedef struct {
   int mqttPort;
   String mqttUserName;
   String mqttPassword;
+
 } config_t;
 
 #define HERZ_AUS 			0		// grundsätzlich ist das Herz aus (Hintergrundfarbe)
