@@ -67,6 +67,7 @@ void Scroller::ScrollerShowAndRun(String text, CRGB c/* = CRGB::White*/) {
         FastLED.show();
         delay(LAUFSCHRIFT_SPEED);
     }
+    Serial.println("Scroller::ScrollerShowAndRun: completed.");
 }
 
 void Scroller::ScrollerTest(String text) {

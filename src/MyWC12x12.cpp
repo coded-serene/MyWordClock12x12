@@ -899,14 +899,6 @@ void SetupMyWc(void)
 }
 
 void LoopMyWc(void) {
-	//
-	// evtl. Update Einspielen
-	//
-#ifdef FEATURE_OTA
-	
-#endif
-	
-
 #if defined(GEBURTSTAGE) || defined(TEMPERATURE)
 	unsigned long jetzt;
 #endif

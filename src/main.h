@@ -4,6 +4,7 @@
 #define __Main_H__ 
 
 #include "./TetrisGame/TetrisGame.h"
+#include "BannerText.h"
 /*  
  ~~~~~~~~~~~~~~~~
  Wordclock-Project
@@ -16,7 +17,6 @@ typedef enum gameCommand {GameCommandNone, GameCommandLeft, GameCommandRight, Ga
 extern void handleTetrisCommand(gameCommand cmd);
 extern void handleClientServer(); // Webserver-Maintain
 
+extern BannerText globalBannerText;
 
-extern String runtimeBannerHintText;
-extern String runtimeBannerText;
 #endif 

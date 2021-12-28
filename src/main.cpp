@@ -3,6 +3,7 @@
 #include <MyWC12x12.h>
 #include <ArduinoOTA.h>         // OTA library
 #include "main.h"
+#include "BannerText.h"
 
 void mqttReceiveCallback(char* topic, byte* payload, unsigned int length); 
 bool mqttReconnect(int maxTrails=10);
@@ -10,7 +11,7 @@ void mqttMaintain(void);
 void wifiReconnect(void);
 void setupMQTT(void);
 
-
+BannerText globalBannerText;
 String runtimeBannerHintText;
 String runtimeBannerText;
 
@@ -39,7 +40,10 @@ void loop(void)
 	ArduinoOTA.handle();
 	handleClientServer();
 	mqttMaintain();
-
+	if(globalBannerText.ShowBannerTextIfRequired())
+	{
+		return;	// es wurde ein Scrolltext angezeigt.
+	}
 	if((clockModeActive==false) && (millis() > autoClockActivateTime))
 	{
 		Serial.println("Switch Back to ClockMode due to Tetris idle.");
@@ -150,6 +154,21 @@ void mqttReceiveCallback(char* topic, byte* payload, unsigned int length)
 		default: break;
 	}
 	handleTetrisCommand(cmd);
+
+	String stringPayload = String((char*)payload);
+	if(topicString.endsWith("Config/BannerHintText"))
+	{
+		Serial.print(F("BannerHintText (string): "));
+		Serial.println(stringPayload);
+		globalBannerText.SetRuntimeBannerHintText(stringPayload); 
+	}
+	if(topicString.endsWith("Config/BannerText"))
+	{
+		Serial.print(F("BannerText (string): "));
+		Serial.println(stringPayload);
+		globalBannerText.SetRuntimeBannerText(stringPayload); 
+	}
+	
 }
 
 
